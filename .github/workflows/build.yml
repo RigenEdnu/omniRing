@@ -1,0 +1,57 @@
+name: Build & CI Check
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  check-and-build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Frontend Dependencies
+        run: npm install
+
+      - name: Typecheck Frontend
+        run: npx tsc --noEmit
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Cargo Check
+        run: |
+          cd src-tauri
+          cargo check --verbose
+
+      - name: Build Tauri App
+        run: npx tauri build --no-bundle
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniring-windows-x64
+          path: |
+            src-tauri/target/release/*.exe
+            src-tauri/target/release/*.dll
+          if-no-files-found: warn

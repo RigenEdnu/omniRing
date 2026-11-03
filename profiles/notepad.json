@@ -1,0 +1,44 @@
+{
+  "profile_name": "Notepad",
+  "process_targets": ["notepad.exe"],
+  "inner_radius": 50,
+  "outer_radius": 140,
+  "slices": [
+    {
+      "id": "slice_new",
+      "label": "New File",
+      "icon": "code",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "n"]
+      }
+    },
+    {
+      "id": "slice_save",
+      "label": "Save",
+      "icon": "copy",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "s"]
+      }
+    },
+    {
+      "id": "slice_find",
+      "label": "Find",
+      "icon": "search",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "f"]
+      }
+    },
+    {
+      "id": "slice_select_all",
+      "label": "Select All",
+      "icon": "clipboard",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "a"]
+      }
+    }
+  ]
+}

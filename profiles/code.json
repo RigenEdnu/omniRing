@@ -1,0 +1,78 @@
+{
+  "profile_name": "Visual Studio Code",
+  "process_targets": ["code.exe"],
+  "inner_radius": 50,
+  "outer_radius": 140,
+  "slices": [
+    {
+      "id": "slice_format",
+      "label": "Format Code",
+      "icon": "code-outline",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Shift", "Alt", "F"]
+      }
+    },
+    {
+      "id": "slice_terminal",
+      "label": "Toggle Terminal",
+      "icon": "terminal",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "`"]
+      }
+    },
+    {
+      "id": "slice_git_tools",
+      "label": "Git Tools",
+      "icon": "git-branch",
+      "action": {
+        "type": "Submenu",
+        "target_ring_id": "git_tools"
+      }
+    },
+    {
+      "id": "slice_command",
+      "label": "Command Palette",
+      "icon": "search",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "Shift", "P"]
+      }
+    }
+  ],
+  "submenus": {
+    "git_tools": {
+      "title": "Git Operations",
+      "slices": [
+        {
+          "id": "slice_git_commit",
+          "label": "Git View",
+          "icon": "code",
+          "action": {
+            "type": "Shortcut",
+            "keys": ["Control", "Shift", "G"]
+          }
+        },
+        {
+          "id": "slice_git_status",
+          "label": "Status Cmd",
+          "icon": "terminal",
+          "action": {
+            "type": "TypeText",
+            "text": "git status\n"
+          }
+        },
+        {
+          "id": "slice_back",
+          "label": "Back",
+          "icon": "arrow-undo",
+          "action": {
+            "type": "Submenu",
+            "target_ring_id": "root"
+          }
+        }
+      ]
+    }
+  }
+}

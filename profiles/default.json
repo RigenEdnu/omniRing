@@ -1,0 +1,44 @@
+{
+  "profile_name": "Default Global",
+  "process_targets": ["*"],
+  "inner_radius": 50,
+  "outer_radius": 140,
+  "slices": [
+    {
+      "id": "slice_copy",
+      "label": "Copy",
+      "icon": "copy",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "c"]
+      }
+    },
+    {
+      "id": "slice_paste",
+      "label": "Paste",
+      "icon": "clipboard",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "v"]
+      }
+    },
+    {
+      "id": "slice_undo",
+      "label": "Undo",
+      "icon": "arrow-undo",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "z"]
+      }
+    },
+    {
+      "id": "slice_redo",
+      "label": "Redo",
+      "icon": "arrow-redo",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Control", "y"]
+      }
+    }
+  ]
+}

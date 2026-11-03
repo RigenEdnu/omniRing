@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+target/
+src-tauri/target/
+
+# Build artifacts
+dist/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+
+# Reference binaries (large binaries)
+*.Msix
+*.exe
+!src-tauri/
+
+# Knowledge Graph & Analysis
+graphify-out/
