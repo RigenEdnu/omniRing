@@ -37,7 +37,7 @@ pub struct ProcessInfo {
 
 /// Helper function to retrieve process ID, image path, and title from an active window handle.
 pub fn get_process_info_from_hwnd(hwnd: HWND) -> Option<ProcessInfo> {
-    if hwnd.0 == 0 {
+    if hwnd.0 as usize == 0 {
         return None;
     }
 
@@ -110,7 +110,7 @@ pub fn get_process_info_from_hwnd(hwnd: HWND) -> Option<ProcessInfo> {
 /// Retrieves the process information of the current foreground window.
 pub fn get_current_foreground_process() -> Option<ProcessInfo> {
     let hwnd = unsafe { GetForegroundWindow() };
-    if hwnd.0 == 0 {
+    if hwnd.0 as usize == 0 {
         return None;
     }
     get_process_info_from_hwnd(hwnd)
@@ -138,13 +138,13 @@ unsafe extern "system" fn win_event_proc(
         return;
     }
 
-    let target_hwnd = if hwnd.0 != 0 {
+    let target_hwnd = if hwnd.0 as usize != 0 {
         hwnd
     } else {
         GetForegroundWindow()
     };
 
-    if target_hwnd.0 == 0 {
+    if target_hwnd.0 as usize == 0 {
         return;
     }
 

@@ -1,12 +1,21 @@
 # Progress Log: omniRing
 
 ## Status Proyek Saat Ini
-- **Fase**: Langkah 9 Selesai (System Tray & Tray Controls)
+- **Fase**: Langkah 9 Selesai (System Tray & Tray Controls) + Penyelarasan Dependensi Windows Crate v0.62 untuk CI
 - **Status Eksekusi**: Siap masuk ke Langkah 10 (Settings & Persistence / End-to-End Release Validation)
 
 ---
 
 ## Log Eksekusi Milestone
+
+### [Perbaikan CI / Cargo Check] Penyelarasan Dependensi `windows` Crate ke `0.62` (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Penyelarasan versi crate `windows` di `src-tauri/Cargo.toml` dari `0.58` ke `0.62` agar sesuai dengan dependensi `windows` (`0.62.2`) yang ditarik oleh Tauri v2.12+ pada CI GitHub Actions runner.
+  2. Mengatasi mismatch tipe `expected HWND, found windows::Win32::Foundation::HWND` pada `src-tauri/src/lib.rs` saat memanggil `hide_overlay`, `show_overlay_clamped`, dan `apply_overlay_styles`.
+  3. Pembaruan pengecekan handle `hwnd` di `src-tauri/src/profile/watcher.rs` (baris 40, 113, 141, 147) menggunakan `hwnd.0 as usize == 0` / `!= 0` yang aman dan kompatibel terhadap perubahan representasi internal handle `HWND`.
+- **Hasil Verifikasi**:
+  - `npm run build` sukses mengompilasi TypeScript dan mem-bundle aset web (0 error, 0 warning).
+  - Inspeksi statis kode memvalidasi seluruh simbol Win32 API tetap konsisten dan siap untuk `cargo check` di GitHub Actions CI.
 
 ### [Langkah 9] System Tray & Tray Controls (Selesai)
 - **Aktivitas yang Diselesaikan**:
