@@ -30,5 +30,7 @@ body {
   image-rendering: -webkit-optimize-contrast;
   transform: translateZ(0);
   will-change: transform, opacity;
+  background: transparent;
+  cursor: default;
 }
 

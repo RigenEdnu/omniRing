@@ -1,12 +1,155 @@
 # Progress Log: omniRing
 
 ## Status Proyek Saat Ini
-- **Fase**: Langkah 9 Selesai (System Tray & Tray Controls) + Penyelarasan Dependensi Windows Crate v0.62 untuk CI
-- **Status Eksekusi**: Siap masuk ke Langkah 10 (Settings & Persistence / End-to-End Release Validation)
+- **Fase**: UI Redesign & Feature Development Selesai (Task 1 sampai Task 5 rampung)
+- **Status Eksekusi**: Seluruh rencana implementasi UI Redesign & Feature Development telah selesai, terverifikasi, dan terdokumentasi.
 
 ---
 
 ## Log Eksekusi Milestone
+
+### [UI Redesign / Task 5] Memory Bank Update & Documentation Review (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Pembaruan peta arsitektur dan struktur file pada `memory-bank/architecture.md`:
+     - Pencatatan konfigurasi multi-window Tauri (`main` overlay transparan dan `configurator` desktop).
+     - Pencatatan pipeline multi-page Vite (`index.html` dan `config.html`).
+     - Dokumentasi modul `hook::worker` (`TriggerMode`, `GetAsyncKeyState`, outside-click auto-close, supresi Esc `LRESULT(1)`).
+     - Dokumentasi modul `tray::mod` ("Configure OmniRing" dan handler double-click).
+     - Dokumentasi frontend modul `main.ts`, `config.ts`, dan `canvas_renderer.ts`.
+  2. Pembaruan spesifikasi desain teknis pada `memory-bank/design-document.md`:
+     - Diagram arsitektur sistem multi-window (Radial Overlay UI dan Desktop Configurator).
+     - Arsitektur antarmuka Bubble Nodes melingkar Logitech Options+ (hub tengah r=22px dengan simbol '×' dan dead-zone < 26px, 8 circular action bubble nodes r=24px pada orbital radius 95px, floating pill badges r=175px, hover glow 1.12x, dan hit-testing polar Fitts's Law 45 derajat).
+     - Arsitektur antarmuka Desktop Configurator & Action Library (strip tab profil, preview interaktif 8-slot wheel, ring seleksi slot aktif, pencarian instan, 4 accordion kategori, dan tab pengaturan trigger mode).
+     - Spesifikasi JSON schema profil terkini dan kriteria penerimaan (acceptance criteria) lengkap.
+  3. Pembaruan log riwayat progres dan pencatatan milestone penyelesaian pada `memory-bank/progress.md`.
+  4. Penyusunan ulang panduan pengguna komprehensif pada `README.md`:
+     - Dokumentasi visual Bubble Nodes UI dan cara interaksi kursor / hub tengah '×'.
+     - Panduan penggunaan Desktop Configurator Window dan Action Library.
+     - Penjelasan lengkap sistem multi-mode trigger (`Hold`, `Combo`, `CornerHover`).
+     - Penjelasan sistem auto-close (Outside Click) dan supresi pembatalan tombol Escape.
+     - Struktur JSON konfigurasi profil terbaru.
+  5. Validasi kualitas dan kepatuhan aturan proyek:
+     - Pemeriksaan sintaksis markdown dan pembersihan karakter em dash.
+     - Verifikasi kompilasi frontend via `npm run build` (`tsc && vite build`).
+     - Verifikasi unit test visual renderer via `node test-renderer.mjs`.
+- **Hasil Verifikasi**:
+  - `npm run build` (`tsc && vite build`) sukses (0 error, 0 warning).
+  - `node test-renderer.mjs` lolos 100% (8 test assertions).
+  - Pengecekan karakter em dash di seluruh berkas dokumentasi: 0 ditemukan.
+
+### [UI Redesign / Task 4] System Tray Integration & End-to-End Interaction Coordination (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Penambahan opsi menu "Configure OmniRing" pada System Tray di `src-tauri/src/tray/mod.rs`:
+     - Menambahkan konstanta `MENU_ID_OPEN_CONFIGURATOR = "open_configurator"`.
+     - Menambahkan item menu `Configure OmniRing` ke builder tray menu.
+     - Implementasi `open_configurator_window` untuk menampilkan, unminimize, dan memberi fokus (`set_focus`) pada jendela `configurator`.
+     - Konfigurasi event double-click pada tray icon agar langsung membuka jendela configurator.
+     - Penambahan unit test `test_tray_menu_ids` untuk memastikan konstanta menu ID valid.
+  2. Implementasi dan registrasi perintah Tauri di `src-tauri/src/lib.rs`:
+     - Perintah `open_configurator_window`: memungkinkan pemanggilan pembukaan jendela configurator melalui IPC.
+     - Perintah `save_profile`: menyimpan konfigurasi profil ke disk JSON di direktori profil, memperbarui cache manager, dan memancarkan event `omniring://profile-changed` ke seluruh runtime webview.
+     - Pendaftaran `open_configurator_window` dan `save_profile` pada `tauri::generate_handler!`.
+  3. Penambahan method `save_profile` pada `ProfileManager` di `src-tauri/src/profile/config.rs`:
+     - Menulis serialisasi JSON terformat (`serde_json::to_string_pretty`) ke disk.
+     - Memperbarui index internal (`profiles_by_name`, `process_map`, `all_profiles`, `default_profile`).
+     - Penambahan unit test `test_save_profile_in_temp_dir`.
+  4. Penyempurnaan koordinasi interaksi pada `src/scripts/main.ts`:
+     - Penanganan pembatalan via center dismiss hub (x): deteksi koordinat pelepasan kursor pada dead-zone tengah (< 26px) menggunakan `renderer.isCenterHub(x, y)` untuk membatalkan dan menyembunyikan overlay tanpa memicu aksi.
+     - Penutupan otomatis instan (instant auto-close) sebelum aksi terminal dieksekusi: overlay langsung memanggil `hide_overlay`, membersihkan canvas, dan mereset penempatan sebelum `execute_action` dipanggil, memastikan jendela target menerima fokus secara utuh.
+     - Penanganan dismiss tombol Escape (`keydown`) dan outside-click pointer event pada canvas/webview fallback.
+     - Ekspor fungsi helper `openConfiguratorWindow` untuk akses antarmuka frontend.
+  5. Sinkronisasi dua arah real-time pada `src/scripts/config.ts`:
+     - Penambahan listener event `omniring://profile-changed` agar jendela configurator otomatis menyelaraskan perubahan saat profil berganti di background.
+     - Integrasi fungsi `syncActiveProfile` yang memanggil `save_profile` saat penugasan aksi slot, undo, redo, pembersihan slot, reset irisan, maupun pembuatan profil baru.
+- **Hasil Verifikasi**:
+  - `python verify_task4.py` sukses 100% (semua checks tray mod, lib.rs, profile config, main.ts, dan config.ts lolos).
+  - `node test-renderer.mjs` lolos 100% (8 test assertions).
+  - `npm run build` (`tsc && vite build`) sukses (0 error, 0 warning).
+
+### [UI Redesign / Task 3] Configurator Window UI & Action Library (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Konfigurasi multi-page build pada `vite.config.ts` dan `src-tauri/tauri.conf.json`:
+     - Menambahkan entri input multi-page Vite `main: "index.html"` dan `config: "config.html"`.
+     - Mendaftarkan window `configurator` pada `src-tauri/tauri.conf.json` (`url: "config.html"`, `width: 980`, `height: 680`, `decorations: true`, `visible: false`).
+  2. Implementasi struktur HTML configurator desktop pada `config.html` sesuai referensi Loupedeck & Logitech Options+ (`docs/menu.png`):
+     - Header: strip navigasi tab profil aplikasi (`Default Global`, `VS Code`, `Notepad`, `+ Add Profile`), tombol beralih tab view (Ring Editor vs Trigger Settings), serta aksi `Open Folder` dan `Reload Profiles`.
+     - Workspace kiri (70%): Preview interaktif 8-slot wheel omniRing dengan node bubble melingkar, outer pill badges, slot selection highlight, dan dock kontrol bawah (Undo, Redo, Clear Slot, Reset Slices).
+     - Sidebar kanan (30%): Header `ACTION LIBRARY`, kolom pencarian instan, accordion kategori (System Actions, Device Navigation & Folders, Keyboard Shortcuts, App Launchers & URLs), dan tombol tambah aksi kustom.
+     - Tab view Pengaturan Trigger: konfigurasi interaktif mode trigger (`Hold`, `Combo`, `CornerHover`) dan ringkasan gesture flick 4 arah.
+     - Modal dialog: form penambahan profil aplikasi baru dan form pembuatan aksi shortcut/URL/aplikasi kustom.
+     - Floating toast notifications untuk umpan balik tindakan pengguna.
+  3. Implementasi styling CSS presisi pada `src/styles/config.css`:
+     - Palet warna light theme bersih (`#F8F9FA` background, `#FFFFFF` panels, `#E4E4E7` borders, `#5E48E8` accent purple, `#18181B` bubble nodes).
+     - Transisi halus untuk accordion, kartu aksi, efek hover node, serta ring seleksi slot aktif berpendar (`#5E48E8`).
+  4. Implementasi logika interaksi pada `src/scripts/config.ts`:
+     - Integrasi IPC Tauri (`list_available_profiles`, `get_active_profile`, `set_active_profile_by_name`, `get_trigger_mode`, `set_trigger_mode`, `open_config_folder`, `reload_profiles`) dengan fallback mockup ketika diakses via browser dev/preview.
+     - Visualisasi wheel canvas menggunakan `CanvasRenderer` dengan deteksi hover dan seleksi slot (0..7) serta pembatalan via inner hub (`x`).
+     - Alokasi aksi instan: klik slot pada wheel lalu klik kartu pada Action Library untuk menetapkan aksi secara real-time disertai riwayat Undo/Redo.
+     - Pencarian instan yang memfilter kartu aksi pada seluruh kategori secara langsung.
+     - Sinkronisasi dan penyimpanan pengaturan trigger mode ke backend Tauri.
+- **Hasil Verifikasi**:
+  - `npm run build` (`tsc && vite build`) sukses 100%, menghasilkan bundle terpisah `dist/index.html` dan `dist/config.html` tanpa error.
+  - `node test-renderer.mjs` lolos 100% (8 test assertions).
+
+### [UI Redesign / Task 2] Advanced Native Trigger System & Auto-Close Engine (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Penambahan model data `TriggerMode` pada `src-tauri/src/hook/worker.rs` dan re-ekspor pada `src-tauri/src/hook/mod.rs` serta `src-tauri/src/gesture/mod.rs`:
+     - `Hold { button: MouseButton, hold_ms: u32 }`
+     - `Combo { modifiers: Vec<String>, button: MouseButton }`
+     - `CornerHover { corner: String, dwell_ms: u32 }`
+  2. Implementasi deteksi modifier Combo keyboard dan mouse via Win32 `GetAsyncKeyState`:
+     - Fungsi pendukung `is_modifier_pressed` dan `are_modifiers_pressed` mengevaluasi status penekanan tombol modifier (`VK_CONTROL`, `VK_SHIFT`, `VK_MENU`, `VK_LWIN`).
+     - Jika kombinasi modifier ditahan saat tombol mouse ditekan, aksi dicegat dan menu radial terbuka seketika tanpa jeda hold timer.
+     - Jika modifier tidak ditekan, klik mouse diteruskan langsung ke sistem (`CallNextHookEx`) tanpa supresi, memastikan context menu atau klik biasa tidak terganggu.
+  3. Implementasi penutupan otomatis saat klik di luar menu (Outside-Click Auto-Close):
+     - Pada `mouse_ll_hook_proc`, ketika state `radial_active` bernilai true dan mouse down terdeteksi di luar radius menu (`dist > outer_radius + tolerance`), overlay dibatalkan seketika (`HookEvent::OutsideClick`), status radial direset, dan klik tidak disupresi sehingga langsung diteruskan ke window di latar belakang.
+  4. Pemasangan hook keyboard ringan `WH_KEYBOARD_LL` untuk pembatalan via Esc:
+     - Menginspeksi `WM_KEYDOWN` / `WM_SYSKEYDOWN` untuk virtual key `VK_ESCAPE` (0x1B).
+     - Jika menu radial aktif, event `HookEvent::RadialCancel` dikirimkan untuk menutup overlay, dan tombol Esc disupresi (`LRESULT(1)`) agar tidak membatalkan pekerjaan pada aplikasi di bawahnya.
+  5. Penyediaan dan registrasi Tauri Commands:
+     - `get_trigger_mode`: membaca konfigurasi mode pemicu saat ini.
+     - `set_trigger_mode`: memperbarui mode pemicu secara dinamis pada hook worker dan gesture engine tanpa merestart thread.
+     - Pembaruan `set_hook_trigger_button` agar sinkron dengan `TriggerMode::Hold`.
+     - Registrasi handler macro Tauri `get_trigger_mode` dan `set_trigger_mode` pada `src-tauri/src/lib.rs`.
+- **Hasil Verifikasi**:
+  - `python verify_task2.py` sukses 100% (inspeksi statis struct, enum, handler command, dan simulasi schema JSON lolos).
+  - `node test-renderer.mjs` lolos 100% (8 test assertions).
+  - `npm run build` (`tsc && vite build`) sukses (0 error, 0 warning).
+
+### [UI Redesign / Task 1] Transformasi Canvas Polar Renderer ke Bubble Nodes UI Logitech Options+ (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Perombakan total rendering canvas di `src/scripts/canvas_renderer.ts` dari model annular sector (irisan pie) menjadi antarmuka Bubble Nodes sirkular presisi sesuai referensi `docs/bubbles.webp`:
+     - Hub tengah: tombol batal lingkaran kecil (`r = 22px`) dengan simbol silang '×' (`lineWidth = 2px`, stroke `#475569`, proteksi dead-zone `< 26px`).
+     - Node aksi: 8 lingkaran gelap/hitam (`r = 24px`, `#18181b`) pada radius orbital 95px dengan ikon vektor putih beresolusi tinggi (stroke 2px).
+     - Label mengambang: pill badge putih (`#ffffff`, border-radius 6px, drop shadow `rgba(0,0,0,0.12)`) pada radius orbital 175px sepanjang vektor radial sudut irisan.
+     - Efek hover aktif: node membesar 1.12x (`r = 26.88px`) dengan aksen glow ring (`#5E48E8`, blur 16px), dan pill badge beralih ke kontras tinggi (`#18181b` dengan teks putih dan aksen border ungu).
+     - Hit-testing: algoritma koordinat polar Fitts's Law dengan pembagian 8 kuadran sudut 45 derajat (dimulai dari jam 12 / -90 derajat) dan proteksi dead-zone hub tengah serta toleransi batas luar.
+     - Penambahan pustaka ikon vektor bawaan: `play-pause`, `new-note`, `sparkles`, `lock`, `options`, `screenshot`, `emoji`, `folder`, `copy`, `paste`, `undo`, `redo`, `terminal`, `code`, `search`, `layout`.
+  2. Pembaruan styling di `src/styles/overlay.css`: penataan canvas container transparan, hardware-accelerated transform, dan pointer-events.
+  3. Pembaruan `DEFAULT_RING_CONFIG` dan `profiles/default.json` dengan 8 node aksi bubble default.
+  4. Pembuatan skrip uji scratch `test-renderer.mjs` untuk verifikasi polar logic, pembagian sudut 45 derajat, dead-zone, dan hit-testing.
+- **Hasil Verifikasi**:
+  - `node test-renderer.mjs` lolos 100% (8 test assertions: count, angular distribution, dead-zone hub, 8 orbital nodes, floating pills, outer tolerance, isCenterHub, render cycle).
+  - `npm run build` (`tsc && vite build`) sukses (0 error, 0 warning).
+
+### [Langkah 10 / Rilis] Tinjauan Paket Binary Release Windows x64 & Pembuatan README.md (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Tinjauan dan inspeksi integritas paket biner release `omniring-windows-x64.zip` (9.302.528 bytes):
+     - Memvalidasi header PE32+ (x86_64, AMD64 `0x8664`, GUI Subsystem) untuk file executable `omniring.exe`.
+     - Memverifikasi keberadaan simbol sistem `SetWindowsHookExW`, `SendInput`, dan identifier aplikasi `omniring`.
+  2. Penyusunan dokumentasi komprehensif `README.md`:
+     - Deskripsi produk, arsitektur *zero focus stealing*, dan fitur inti.
+     - Persyaratan sistem (Windows 10/11 x64, WebView2 Runtime).
+     - Panduan penggunaan tombol pemicu mouse (Tap biasa, Flick terarah 4 arah, Hold radial menu).
+     - Navigasi menu radial, eksekusi irisan, pembatalan pada inner hub, dan navigasi submenu bertingkat.
+     - Kontrol system tray (Open Config Folder, Reload Profiles, Toggle Enable/Disable, Exit).
+     - Spesifikasi konfigurasi profil JSON lengkap (`Shortcut`, `TypeText`, `OpenApp`, `OpenUrl`, `Submenu`, `Sequence`).
+     - Tips pemecahan masalah (elevasi hak akses administrator jika target elevated).
+  3. Pembaruan peta arsitektur pada `memory-bank/architecture.md`.
+- **Hasil Verifikasi**:
+  - Validasi header PE32+ sukses (AMD64, 6 section, valid PE signature).
+  - Validasi sintaksis `README.md` bebas dari karakter em-dash sesuai konvensi gaya komunikasi.
+  - `npm run build` (`tsc && vite build`) sukses (0 error, 0 warning).
 
 ### [Perbaikan CI / Cargo Check] Resolusi Macro Namespace Tauri Command & Parameter SetWindowPos Windows Crate v0.62 (Selesai)
 - **Aktivitas yang Diselesaikan**:

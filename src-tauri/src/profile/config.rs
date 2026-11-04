@@ -351,6 +351,66 @@ impl ProfileManager {
         // 3. Fallback to default profile
         self.default_profile.clone()
     }
+
+    /// Saves or updates a profile to disk in the profiles directory.
+    pub fn save_profile(&mut self, profile: &ProfileConfig) -> Result<PathBuf, String> {
+        if !self.profiles_dir.exists() {
+            fs::create_dir_all(&self.profiles_dir)
+                .map_err(|e| format!("Failed to create profiles dir: {}", e))?;
+        }
+
+        let file_stem = if profile.profile_name.eq_ignore_ascii_case("default")
+            || profile.process_targets.iter().any(|t| t == "*")
+        {
+            "default".to_string()
+        } else if let Some(target) = profile.process_targets.first() {
+            let t = normalize_target_name(target);
+            let s = t.trim_end_matches(".exe").to_lowercase();
+            if s.is_empty() {
+                profile.profile_name.trim().to_lowercase().replace(' ', "_")
+            } else {
+                s
+            }
+        } else {
+            profile.profile_name.trim().to_lowercase().replace(' ', "_")
+        };
+
+        let file_path = self.profiles_dir.join(format!("{}.json", file_stem));
+        let json_str = serde_json::to_string_pretty(profile)
+            .map_err(|e| format!("Serialization error: {}", e))?;
+
+        fs::write(&file_path, json_str)
+            .map_err(|e| format!("Failed to write profile to {:?}: {}", file_path, e))?;
+
+        // Re-index profile in manager
+        self.profiles_by_name.insert(
+            profile.profile_name.trim().to_lowercase(),
+            profile.clone(),
+        );
+
+        if file_stem == "default" {
+            self.default_profile = profile.clone();
+        }
+
+        for target in &profile.process_targets {
+            let norm = normalize_target_name(target);
+            if norm != "*" {
+                self.process_map.insert(norm.clone(), profile.clone());
+                let base = norm.trim_end_matches(".exe").to_string();
+                if !base.is_empty() && base != norm {
+                    self.process_map.insert(base, profile.clone());
+                }
+            }
+        }
+
+        if let Some(pos) = self.all_profiles.iter().position(|p| p.profile_name == profile.profile_name) {
+            self.all_profiles[pos] = profile.clone();
+        } else {
+            self.all_profiles.push(profile.clone());
+        }
+
+        Ok(file_path)
+    }
 }
 
 /// Resolves the candidate directory for storing JSON profile configurations.
@@ -509,5 +569,29 @@ mod tests {
 
         // Non-existent submenu
         assert!(prof.get_ring_slices("invalid_ring").is_none());
+    }
+
+    #[test]
+    fn test_save_profile_in_temp_dir() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "omniring_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut mgr = ProfileManager::new(&temp_dir);
+        let mut prof = ProfileConfig::default();
+        prof.profile_name = "Test Unit".to_string();
+        prof.process_targets = vec!["test_app.exe".to_string()];
+
+        let saved_path = mgr.save_profile(&prof).expect("should save successfully");
+        assert!(saved_path.exists());
+
+        let retrieved = mgr.get_profile_by_name("Test Unit");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().profile_name, "Test Unit");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

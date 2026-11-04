@@ -1,43 +1,79 @@
 {
   "profile_name": "Default Global",
   "process_targets": ["*"],
-  "inner_radius": 50,
-  "outer_radius": 140,
+  "inner_radius": 26,
+  "outer_radius": 200,
   "slices": [
     {
-      "id": "slice_copy",
-      "label": "Copy",
-      "icon": "copy",
+      "id": "slice_play_pause",
+      "label": "Play/Pause",
+      "icon": "play-pause",
       "action": {
         "type": "Shortcut",
-        "keys": ["Control", "c"]
+        "keys": ["MediaPlayPause"]
       }
     },
     {
-      "id": "slice_paste",
-      "label": "Paste",
-      "icon": "clipboard",
+      "id": "slice_new_note",
+      "label": "New note",
+      "icon": "new-note",
       "action": {
         "type": "Shortcut",
-        "keys": ["Control", "v"]
+        "keys": ["Control", "n"]
       }
     },
     {
-      "id": "slice_undo",
-      "label": "Undo",
-      "icon": "arrow-undo",
+      "id": "slice_explore_ai",
+      "label": "Explore AI",
+      "icon": "sparkles",
       "action": {
-        "type": "Shortcut",
-        "keys": ["Control", "z"]
+        "type": "OpenUrl",
+        "url": "https://chatgpt.com"
       }
     },
     {
-      "id": "slice_redo",
-      "label": "Redo",
-      "icon": "arrow-redo",
+      "id": "slice_lock",
+      "label": "Lock workstation",
+      "icon": "lock",
       "action": {
         "type": "Shortcut",
-        "keys": ["Control", "y"]
+        "keys": ["Meta", "l"]
+      }
+    },
+    {
+      "id": "slice_options",
+      "label": "Settings",
+      "icon": "options",
+      "action": {
+        "type": "OpenApp",
+        "command": "ms-settings:"
+      }
+    },
+    {
+      "id": "slice_screenshot",
+      "label": "Screenshot",
+      "icon": "screenshot",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Meta", "Shift", "s"]
+      }
+    },
+    {
+      "id": "slice_emoji",
+      "label": "Emoji",
+      "icon": "emoji",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Meta", "."]
+      }
+    },
+    {
+      "id": "slice_finder",
+      "label": "Files",
+      "icon": "folder",
+      "action": {
+        "type": "Shortcut",
+        "keys": ["Meta", "e"]
       }
     }
   ]

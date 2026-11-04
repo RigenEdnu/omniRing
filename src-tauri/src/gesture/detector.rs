@@ -6,7 +6,7 @@
 //! - Flicking: Fast directional swipe detected (> 40px within 150ms); suppresses radial menu.
 //! - RadialActive: Hold timer expired within jitter threshold; radial overlay is active.
 
-use crate::hook::{HookEvent, MouseButton};
+use crate::hook::{HookEvent, MouseButton, TriggerMode};
 use serde::{Deserialize, Serialize};
 
 /// 4-way cardinal directions for gesture flicks.
@@ -143,24 +143,32 @@ impl Default for GestureConfig {
 pub struct GestureDetector {
     config: GestureConfig,
     state: GestureState,
+    trigger_mode: TriggerMode,
     trigger_button: MouseButton,
     start_pos: (i32, i32),
     current_pos: (i32, i32),
     start_timestamp: u32,
     last_timestamp: u32,
+    dwell_start_ms: u32,
 }
 
 impl GestureDetector {
     /// Creates a new gesture detector with specified configuration and trigger button.
     pub fn new(config: GestureConfig, trigger_button: MouseButton) -> Self {
+        let trigger_mode = TriggerMode::Hold {
+            button: trigger_button,
+            hold_ms: config.hold_timeout_ms,
+        };
         Self {
             config,
             state: GestureState::Idle,
+            trigger_mode,
             trigger_button,
             start_pos: (0, 0),
             current_pos: (0, 0),
             start_timestamp: 0,
             last_timestamp: 0,
+            dwell_start_ms: 0,
         }
     }
 
@@ -187,11 +195,33 @@ impl GestureDetector {
     /// Reconfigures the trigger button.
     pub fn set_trigger_button(&mut self, button: MouseButton) {
         self.trigger_button = button;
+        self.trigger_mode = TriggerMode::Hold {
+            button,
+            hold_ms: self.config.hold_timeout_ms,
+        };
+    }
+
+    /// Returns the active trigger mode.
+    pub fn trigger_mode(&self) -> &TriggerMode {
+        &self.trigger_mode
+    }
+
+    /// Reconfigures the trigger mode.
+    pub fn set_trigger_mode(&mut self, mode: TriggerMode) {
+        if let Some(btn) = mode.button() {
+            self.trigger_button = btn;
+        }
+        if let TriggerMode::Hold { hold_ms, .. } = &mode {
+            self.config.hold_timeout_ms = *hold_ms;
+        }
+        self.trigger_mode = mode;
+        self.reset();
     }
 
     /// Processes an incoming raw `HookEvent`.
     pub fn handle_hook_event(&mut self, event: &HookEvent) -> Option<GestureEvent> {
         match event {
+            HookEvent::RadialCancel | HookEvent::OutsideClick { .. } => self.cancel(),
             HookEvent::MouseDown {
                 button,
                 x,
@@ -217,21 +247,63 @@ impl GestureDetector {
         y: i32,
         timestamp: u32,
     ) -> Option<GestureEvent> {
-        if button != self.trigger_button {
-            return None;
+        match &self.trigger_mode {
+            TriggerMode::Hold { button: trigger_btn, .. } => {
+                if button != *trigger_btn {
+                    return None;
+                }
+                self.start_pos = (x, y);
+                self.current_pos = (x, y);
+                self.start_timestamp = timestamp;
+                self.last_timestamp = timestamp;
+                self.state = GestureState::PendingHold;
+                None
+            }
+            TriggerMode::Combo { button: trigger_btn, .. } => {
+                if button != *trigger_btn {
+                    return None;
+                }
+                // Combo mode: modifiers already verified by hook worker; open radial immediately!
+                self.start_pos = (x, y);
+                self.current_pos = (x, y);
+                self.start_timestamp = timestamp;
+                self.last_timestamp = timestamp;
+                self.state = GestureState::RadialActive;
+                Some(GestureEvent::RadialOpen {
+                    center_x: x,
+                    center_y: y,
+                })
+            }
+            TriggerMode::CornerHover { .. } => None,
         }
-
-        self.start_pos = (x, y);
-        self.current_pos = (x, y);
-        self.start_timestamp = timestamp;
-        self.last_timestamp = timestamp;
-        self.state = GestureState::PendingHold;
-        None
     }
 
     /// Handles a mouse move event.
     pub fn on_mouse_move(&mut self, x: i32, y: i32, timestamp: u32) -> Option<GestureEvent> {
         self.last_timestamp = timestamp;
+
+        // If in CornerHover mode and state is Idle:
+        if let TriggerMode::CornerHover { corner, dwell_ms } = &self.trigger_mode {
+            if self.state == GestureState::Idle {
+                self.current_pos = (x, y);
+                if is_point_in_corner(x, y, corner) {
+                    if self.dwell_start_ms == 0 {
+                        self.dwell_start_ms = timestamp;
+                    } else if timestamp.wrapping_sub(self.dwell_start_ms) >= *dwell_ms {
+                        self.state = GestureState::RadialActive;
+                        self.dwell_start_ms = 0;
+                        self.start_pos = (x, y);
+                        return Some(GestureEvent::RadialOpen {
+                            center_x: x,
+                            center_y: y,
+                        });
+                    }
+                } else {
+                    self.dwell_start_ms = 0;
+                }
+                return None;
+            }
+        }
 
         match self.state {
             GestureState::Idle => None,
@@ -341,6 +413,21 @@ impl GestureDetector {
                     center_y: self.start_pos.1,
                 });
             }
+        } else if self.state == GestureState::Idle {
+            if let TriggerMode::CornerHover { dwell_ms, .. } = &self.trigger_mode {
+                if self.dwell_start_ms > 0 {
+                    let elapsed = current_timestamp.wrapping_sub(self.dwell_start_ms);
+                    if elapsed >= *dwell_ms {
+                        self.state = GestureState::RadialActive;
+                        self.dwell_start_ms = 0;
+                        self.start_pos = self.current_pos;
+                        return Some(GestureEvent::RadialOpen {
+                            center_x: self.current_pos.0,
+                            center_y: self.current_pos.1,
+                        });
+                    }
+                }
+            }
         }
         None
     }
@@ -350,6 +437,7 @@ impl GestureDetector {
         if self.state != GestureState::Idle {
             let was_radial = self.state == GestureState::RadialActive;
             self.state = GestureState::Idle;
+            self.dwell_start_ms = 0;
             if was_radial {
                 Some(GestureEvent::Cancelled)
             } else {
@@ -367,6 +455,38 @@ impl GestureDetector {
         self.current_pos = (0, 0);
         self.start_timestamp = 0;
         self.last_timestamp = 0;
+        self.dwell_start_ms = 0;
+    }
+}
+
+/// Checks whether a given cursor coordinate falls within a specified screen corner.
+pub fn is_point_in_corner(x: i32, y: i32, corner: &str) -> bool {
+    let corner_size = 20; // 20px threshold from corner edge
+    let (screen_w, screen_h) = get_screen_dimensions();
+    match corner.to_lowercase().replace('_', "-").as_str() {
+        "top-left" | "topleft" => x <= corner_size && y <= corner_size,
+        "top-right" | "topright" => x >= (screen_w - corner_size) && y <= corner_size,
+        "bottom-left" | "bottomleft" => x <= corner_size && y >= (screen_h - corner_size),
+        "bottom-right" | "bottomright" => {
+            x >= (screen_w - corner_size) && y >= (screen_h - corner_size)
+        }
+        _ => false,
+    }
+}
+
+fn get_screen_dimensions() -> (i32, i32) {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN,
+        };
+        let w = GetSystemMetrics(SM_CXSCREEN);
+        let h = GetSystemMetrics(SM_CYSCREEN);
+        (if w > 0 { w } else { 1920 }, if h > 0 { h } else { 1080 })
+    }
+    #[cfg(not(windows))]
+    {
+        (1920, 1080)
     }
 }
 
@@ -629,6 +749,103 @@ mod tests {
         let ev = detector.on_mouse_down(MouseButton::Left, 100, 100, 1000);
         assert_eq!(ev, None);
         assert_eq!(detector.state(), GestureState::Idle);
+    }
+
+    #[test]
+    fn test_combo_trigger_radial_open_immediately() {
+        let mut detector = GestureDetector::new(GestureConfig::default(), MouseButton::Right);
+        detector.set_trigger_mode(TriggerMode::Combo {
+            modifiers: vec!["ctrl".to_string()],
+            button: MouseButton::Right,
+        });
+
+        // In combo mode, mouse down immediately opens radial menu
+        let ev = detector.on_mouse_down(MouseButton::Right, 250, 350, 1000);
+        assert_eq!(
+            ev,
+            Some(GestureEvent::RadialOpen {
+                center_x: 250,
+                center_y: 350,
+            })
+        );
+        assert_eq!(detector.state(), GestureState::RadialActive);
+
+        // Moving cursor updates slice highlight
+        let move_ev = detector.on_mouse_move(280, 350, 1020);
+        assert_eq!(
+            move_ev,
+            Some(GestureEvent::RadialMove {
+                current_x: 280,
+                current_y: 350,
+                delta_x: 30,
+                delta_y: 0,
+            })
+        );
+
+        // Releasing trigger button confirms release
+        let up_ev = detector.on_mouse_up(MouseButton::Right, 280, 350, 1050);
+        assert_eq!(
+            up_ev,
+            Some(GestureEvent::RadialRelease {
+                current_x: 280,
+                current_y: 350,
+            })
+        );
+        assert_eq!(detector.state(), GestureState::Idle);
+    }
+
+    #[test]
+    fn test_outside_click_cancels_radial() {
+        let mut detector = GestureDetector::new(GestureConfig::default(), MouseButton::X1);
+        detector.on_mouse_down(MouseButton::X1, 300, 300, 1000);
+        detector.check_timeout(1200);
+        assert_eq!(detector.state(), GestureState::RadialActive);
+
+        let ev = detector.handle_hook_event(&HookEvent::OutsideClick { x: 50, y: 50 });
+        assert_eq!(ev, Some(GestureEvent::Cancelled));
+        assert_eq!(detector.state(), GestureState::Idle);
+    }
+
+    #[test]
+    fn test_radial_cancel_hook_event() {
+        let mut detector = GestureDetector::new(GestureConfig::default(), MouseButton::X1);
+        detector.on_mouse_down(MouseButton::X1, 300, 300, 1000);
+        detector.check_timeout(1200);
+        assert_eq!(detector.state(), GestureState::RadialActive);
+
+        let ev = detector.handle_hook_event(&HookEvent::RadialCancel);
+        assert_eq!(ev, Some(GestureEvent::Cancelled));
+        assert_eq!(detector.state(), GestureState::Idle);
+    }
+
+    #[test]
+    fn test_corner_hover_dwell() {
+        let mut detector = GestureDetector::new(GestureConfig::default(), MouseButton::X1);
+        detector.set_trigger_mode(TriggerMode::CornerHover {
+            corner: "top-left".to_string(),
+            dwell_ms: 300,
+        });
+
+        // Move to top-left corner at t=1000 (dwell starts)
+        let ev1 = detector.on_mouse_move(5, 5, 1000);
+        assert_eq!(ev1, None);
+        assert_eq!(detector.state(), GestureState::Idle);
+
+        // Move slightly within corner at t=1200 (elapsed 200ms < 300ms)
+        let ev2 = detector.on_mouse_move(8, 8, 1200);
+        assert_eq!(ev2, None);
+        assert_eq!(detector.state(), GestureState::Idle);
+
+        // Move at t=1350 (elapsed 350ms >= 300ms) triggers radial open!
+        let ev3 = detector.on_mouse_move(10, 10, 1350);
+        assert_eq!(
+            ev3,
+            Some(GestureEvent::RadialOpen {
+                center_x: 10,
+                center_y: 10,
+            })
+        );
+        assert_eq!(detector.state(), GestureState::RadialActive);
     }
 }
 

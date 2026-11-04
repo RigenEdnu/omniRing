@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>omniRing Configurator</title>
+    <link rel="stylesheet" href="/src/styles/config.css" />
+  </head>
+  <body>
+    <div id="app" class="config-app">
+      <!-- Top App Bar & Profile Strip -->
+      <header class="app-header">
+        <div class="header-left">
+          <div class="app-brand" title="omniRing Configurator">
+            <svg class="brand-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+              <circle cx="12" cy="12" r="6"></circle>
+              <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+            </svg>
+            <span class="brand-title">omniRing</span>
+          </div>
+
+          <!-- Profiles Navigation Tabs -->
+          <nav class="profile-tabs" id="profile-tabs" aria-label="Profiles">
+            <!-- Tabs dynamically injected by config.ts -->
+          </nav>
+
+          <button id="btn-add-profile" class="tab-btn-add" title="Add Application Profile">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Add Profile</span>
+          </button>
+        </div>
+
+        <div class="header-right">
+          <!-- View switcher tabs -->
+          <div class="view-switcher" role="tablist">
+            <button id="view-tab-ring" class="view-btn active" role="tab" aria-selected="true" title="Ring Layout & Actions Editor">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <circle cx="12" cy="12" r="4"></circle>
+              </svg>
+              <span>Ring Editor</span>
+            </button>
+            <button id="view-tab-trigger" class="view-btn" role="tab" aria-selected="false" title="Trigger & Gesture Settings">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Trigger Settings</span>
+            </button>
+          </div>
+
+          <div class="header-actions">
+            <button id="btn-open-folder" class="icon-btn" title="Open Profiles Folder in File Explorer">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </button>
+            <button id="btn-reload-profiles" class="icon-btn" title="Reload Profiles from Disk">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Body: Two-Column Workspace -->
+      <main class="main-container">
+        <!-- View 1: Radial Ring Visualizer & Slot Configuration (Default Active) -->
+        <section id="section-ring-editor" class="view-section active">
+          <!-- Left Preview Workspace (70%) -->
+          <div class="workspace-panel">
+            <div class="workspace-header">
+              <div class="profile-info-pill">
+                <span class="profile-title" id="active-profile-name">Default Global</span>
+                <span class="profile-process" id="active-profile-process">Target: All Applications (*)</span>
+              </div>
+              <div class="slot-selection-info" id="slot-selection-banner">
+                <span class="selection-status">Click a slot on the ring to configure its action</span>
+              </div>
+            </div>
+
+            <!-- Canvas Container hosting interactive 8-slot wheel -->
+            <div class="canvas-wrapper">
+              <canvas id="config-wheel-canvas" width="600" height="600"></canvas>
+            </div>
+
+            <!-- Bottom Control Dock -->
+            <div class="workspace-dock">
+              <div class="dock-left">
+                <button id="btn-undo-slot" class="dock-btn" title="Undo Last Change" disabled>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                  </svg>
+                </button>
+                <button id="btn-redo-slot" class="dock-btn" title="Redo" disabled>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="dock-center">
+                <div class="dock-indicator">
+                  <span class="hub-hint">Center &times; deselects slot</span>
+                </div>
+              </div>
+
+              <div class="dock-right">
+                <button id="btn-clear-slot" class="dock-btn-text" title="Clear action from selected slot" disabled>
+                  <span>Clear Slot</span>
+                </button>
+                <button id="btn-reset-profile" class="dock-btn-text" title="Reset profile to defaults">
+                  <span>Reset Slices</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Action Library Sidebar (30%) -->
+          <aside class="sidebar-panel">
+            <div class="sidebar-header">
+              <div class="sidebar-title-row">
+                <div class="sidebar-title-badge">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  <span>ACTION LIBRARY</span>
+                </div>
+                <span class="sidebar-action-count" id="action-count-badge">24 Actions</span>
+              </div>
+
+              <!-- Instant Search Bar -->
+              <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="action-search-input" placeholder="Search actions (Volume, Copy, App...)" autocomplete="off" />
+                <button id="btn-clear-search" class="clear-search-btn" title="Clear search" style="display: none;">&times;</button>
+              </div>
+            </div>
+
+            <!-- Scrollable Categories Accordion Container -->
+            <div class="library-content" id="library-accordion-container">
+              <!-- Category: System Actions -->
+              <div class="accordion-group expanded" data-category="system">
+                <button class="accordion-header">
+                  <div class="accordion-title-left">
+                    <span class="category-name">SYSTEM ACTIONS</span>
+                  </div>
+                  <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-body">
+                  <div class="action-card-list" id="list-system-actions">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category: Device Navigation & Folders -->
+              <div class="accordion-group expanded" data-category="navigation">
+                <button class="accordion-header">
+                  <div class="accordion-title-left">
+                    <span class="category-name">DEVICE NAVIGATION &amp; FOLDERS</span>
+                  </div>
+                  <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-body">
+                  <div class="action-card-list" id="list-navigation-actions">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category: Keyboard Shortcuts -->
+              <div class="accordion-group expanded" data-category="shortcuts">
+                <button class="accordion-header">
+                  <div class="accordion-title-left">
+                    <span class="category-name">KEYBOARD SHORTCUTS</span>
+                  </div>
+                  <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-body">
+                  <div class="action-card-list" id="list-shortcut-actions">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Category: App Launchers & Web URLs -->
+              <div class="accordion-group expanded" data-category="launchers">
+                <button class="accordion-header">
+                  <div class="accordion-title-left">
+                    <span class="category-name">APP LAUNCHERS &amp; URLS</span>
+                  </div>
+                  <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-body">
+                  <div class="action-card-list" id="list-launcher-actions">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Custom Action Card Drawer / Trigger -->
+            <div class="sidebar-footer">
+              <button id="btn-custom-action" class="custom-action-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Add Custom Shortcut or App</span>
+              </button>
+            </div>
+          </aside>
+        </section>
+
+        <!-- View 2: Trigger & Gesture Settings -->
+        <section id="section-trigger-settings" class="view-section">
+          <div class="settings-container">
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h2>Input Trigger Mode</h2>
+                <p>Select how you summon the omniRing radial menu on your desktop.</p>
+              </div>
+
+              <div class="trigger-mode-options">
+                <!-- Option 1: Hold Mode -->
+                <label class="trigger-radio-card" data-mode="Hold">
+                  <input type="radio" name="trigger-mode" value="Hold" checked />
+                  <div class="radio-card-content">
+                    <div class="radio-card-top">
+                      <span class="mode-title">Hold Mouse Button (Default)</span>
+                      <span class="mode-badge">Recommended</span>
+                    </div>
+                    <p class="mode-desc">Hold down your preferred mouse button for a short dwell period to open the ring. Releasing executes the hovered action or gesture flick.</p>
+                    <div class="mode-subsettings" id="subsettings-hold">
+                      <div class="form-row">
+                        <label for="hold-button-select">Trigger Button:</label>
+                        <select id="hold-button-select">
+                          <option value="X1" selected>X1 (Mouse Thumb Back)</option>
+                          <option value="X2">X2 (Mouse Thumb Forward)</option>
+                          <option value="Middle">Middle Click (Scroll Wheel)</option>
+                          <option value="Right">Right Click</option>
+                        </select>
+                      </div>
+                      <div class="form-row">
+                        <label for="hold-delay-range">Hold Duration Threshold: <strong id="hold-delay-val">200 ms</strong></label>
+                        <input type="range" id="hold-delay-range" min="120" max="600" step="20" value="200" />
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Option 2: Combo Mode -->
+                <label class="trigger-radio-card" data-mode="Combo">
+                  <input type="radio" name="trigger-mode" value="Combo" />
+                  <div class="radio-card-content">
+                    <div class="radio-card-top">
+                      <span class="mode-title">Keyboard + Mouse Combo</span>
+                      <span class="mode-badge">Instant</span>
+                    </div>
+                    <p class="mode-desc">Hold one or more keyboard modifier keys while clicking the mouse. Opens the radial menu instantaneously without hold dwell delays.</p>
+                    <div class="mode-subsettings" id="subsettings-combo" style="display: none;">
+                      <div class="form-row">
+                        <label>Modifier Keys:</label>
+                        <div class="modifier-checkboxes">
+                          <label class="mod-checkbox"><input type="checkbox" id="mod-ctrl" value="Control" checked /> Ctrl</label>
+                          <label class="mod-checkbox"><input type="checkbox" id="mod-shift" value="Shift" /> Shift</label>
+                          <label class="mod-checkbox"><input type="checkbox" id="mod-alt" value="Alt" /> Alt</label>
+                          <label class="mod-checkbox"><input type="checkbox" id="mod-win" value="Win" /> Win</label>
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <label for="combo-button-select">Mouse Button:</label>
+                        <select id="combo-button-select">
+                          <option value="Right" selected>Right Click</option>
+                          <option value="Middle">Middle Click</option>
+                          <option value="X1">X1 (Thumb Back)</option>
+                          <option value="X2">X2 (Thumb Forward)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Option 3: Corner Hover Mode -->
+                <label class="trigger-radio-card" data-mode="CornerHover">
+                  <input type="radio" name="trigger-mode" value="CornerHover" />
+                  <div class="radio-card-content">
+                    <div class="radio-card-top">
+                      <span class="mode-title">Corner Screen Hover</span>
+                      <span class="mode-badge">Hands-Free</span>
+                    </div>
+                    <p class="mode-desc">Move the mouse cursor into a designated screen corner and dwell briefly to invoke omniRing without clicking.</p>
+                    <div class="mode-subsettings" id="subsettings-corner" style="display: none;">
+                      <div class="form-row">
+                        <label for="corner-select">Screen Corner:</label>
+                        <select id="corner-select">
+                          <option value="TopLeft" selected>Top-Left Corner</option>
+                          <option value="TopRight">Top-Right Corner</option>
+                          <option value="BottomLeft">Bottom-Left Corner</option>
+                          <option value="BottomRight">Bottom-Right Corner</option>
+                        </select>
+                      </div>
+                      <div class="form-row">
+                        <label for="corner-delay-range">Corner Dwell Duration: <strong id="corner-delay-val">400 ms</strong></label>
+                        <input type="range" id="corner-delay-range" min="200" max="1000" step="50" value="400" />
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div class="settings-card-footer">
+                <button id="btn-save-trigger" class="primary-btn">
+                  <span>Save Trigger Settings</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Gesture Flick Settings Card -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h2>Directional Flick Gestures</h2>
+                <p>Quick flick gestures execute immediately upon releasing the trigger button without navigating the full ring.</p>
+              </div>
+
+              <div class="flick-grid">
+                <div class="flick-item">
+                  <span class="flick-dir">Flick UP</span>
+                  <span class="flick-action-label" id="flick-up-action">Media Play / Pause</span>
+                </div>
+                <div class="flick-item">
+                  <span class="flick-dir">Flick RIGHT</span>
+                  <span class="flick-action-label" id="flick-right-action">Volume Up</span>
+                </div>
+                <div class="flick-item">
+                  <span class="flick-dir">Flick DOWN</span>
+                  <span class="flick-action-label" id="flick-down-action">Lock Workstation</span>
+                </div>
+                <div class="flick-item">
+                  <span class="flick-dir">Flick LEFT</span>
+                  <span class="flick-action-label" id="flick-left-action">File Explorer</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Modal: Add New Profile -->
+      <div id="modal-add-profile" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>Add Application Profile</h3>
+            <button id="btn-close-modal-profile" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="input-profile-name">Profile Name:</label>
+              <input type="text" id="input-profile-name" placeholder="e.g. Figma, Adobe Photoshop" />
+            </div>
+            <div class="form-group">
+              <label for="input-process-target">Executable Process Target:</label>
+              <input type="text" id="input-process-target" placeholder="e.g. Figma.exe, photoshop.exe" />
+              <small class="form-hint">Enter the executable name matching the foreground window.</small>
+            </div>
+            <div class="form-group">
+              <label for="select-profile-template">Start with Template:</label>
+              <select id="select-profile-template">
+                <option value="default">Default Global Actions (8 Slots)</option>
+                <option value="code">Development &amp; Git Shortcuts</option>
+                <option value="empty">Empty Ring (Blank Slots)</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-cancel-add-profile" class="secondary-btn">Cancel</button>
+            <button id="btn-confirm-add-profile" class="primary-btn">Create Profile</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Custom Action / Shortcut -->
+      <div id="modal-custom-action" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>Add Custom Action</h3>
+            <button id="btn-close-modal-action" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="input-custom-label">Action Label:</label>
+              <input type="text" id="input-custom-label" placeholder="e.g. Format Document, Open Notion" />
+            </div>
+            <div class="form-group">
+              <label for="select-custom-type">Action Type:</label>
+              <select id="select-custom-type">
+                <option value="Shortcut">Keyboard Shortcut</option>
+                <option value="OpenApp">Launch Application / Command</option>
+                <option value="OpenUrl">Open Web URL</option>
+                <option value="TypeText">Type Text (Keystrokes)</option>
+              </select>
+            </div>
+            <div class="form-group" id="group-custom-keys">
+              <label for="input-custom-keys">Shortcut Keys (comma-separated):</label>
+              <input type="text" id="input-custom-keys" placeholder="e.g. Control, Shift, f" />
+            </div>
+            <div class="form-group" id="group-custom-value" style="display: none;">
+              <label for="input-custom-value" id="label-custom-value">Command or URL:</label>
+              <input type="text" id="input-custom-value" placeholder="https://..." />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="btn-cancel-custom-action" class="secondary-btn">Cancel</button>
+            <button id="btn-confirm-custom-action" class="primary-btn">Add to Library</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Toast Notifications -->
+      <div id="toast-container" class="toast-container"></div>
+    </div>
+
+    <!-- Script entry point -->
+    <script type="module" src="/src/scripts/config.ts"></script>
+  </body>
+</html>

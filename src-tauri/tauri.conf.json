@@ -24,6 +24,21 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false
+      },
+      {
+        "title": "omniRing Configurator",
+        "label": "configurator",
+        "url": "config.html",
+        "width": 980,
+        "height": 680,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "shadow": true,
+        "visible": false
       }
     ],
     "security": {

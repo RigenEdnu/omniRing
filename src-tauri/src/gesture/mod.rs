@@ -1,13 +1,14 @@
 pub mod detector;
 
 pub use detector::{
-    replay_tap_click, Direction, GestureConfig, GestureDetector, GestureEvent, GestureState,
+    is_point_in_corner, replay_tap_click, Direction, GestureConfig, GestureDetector, GestureEvent,
+    GestureState,
 };
 
-use crate::hook::HookEvent;
+use crate::hook::{HookEvent, TriggerMode};
 use crossbeam_channel::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -15,6 +16,7 @@ use std::time::Duration;
 pub struct GestureWorker {
     thread_handle: Option<JoinHandle<()>>,
     is_running: Arc<AtomicBool>,
+    trigger_mode: Arc<RwLock<TriggerMode>>,
 }
 
 impl GestureWorker {
@@ -24,7 +26,7 @@ impl GestureWorker {
     pub fn start<F>(
         hook_receiver: Receiver<HookEvent>,
         config: GestureConfig,
-        trigger_button: crate::hook::MouseButton,
+        trigger_mode: TriggerMode,
         on_gesture: F,
     ) -> Result<Self, String>
     where
@@ -32,13 +34,23 @@ impl GestureWorker {
     {
         let is_running = Arc::new(AtomicBool::new(true));
         let running_clone = Arc::clone(&is_running);
+        let trigger_mode_arc = Arc::new(RwLock::new(trigger_mode.clone()));
+        let trigger_mode_clone = Arc::clone(&trigger_mode_arc);
 
         let thread_handle = std::thread::Builder::new()
             .name("omniring-gesture-worker".to_string())
             .spawn(move || {
-                let mut detector = GestureDetector::new(config, trigger_button);
+                let initial_btn = trigger_mode.button().unwrap_or(crate::hook::MouseButton::X1);
+                let mut detector = GestureDetector::new(config, initial_btn);
+                detector.set_trigger_mode(trigger_mode);
 
                 while running_clone.load(Ordering::Relaxed) {
+                    if let Ok(tm) = trigger_mode_clone.read() {
+                        if detector.trigger_mode() != &*tm {
+                            detector.set_trigger_mode(tm.clone());
+                        }
+                    }
+
                     match hook_receiver.recv_timeout(Duration::from_millis(10)) {
                         Ok(hook_event) => {
                             if let Some(event) = detector.handle_hook_event(&hook_event) {
@@ -67,7 +79,15 @@ impl GestureWorker {
         Ok(Self {
             thread_handle: Some(thread_handle),
             is_running,
+            trigger_mode: trigger_mode_arc,
         })
+    }
+
+    /// Dynamically updates the active trigger mode.
+    pub fn set_trigger_mode(&self, mode: TriggerMode) {
+        if let Ok(mut tm) = self.trigger_mode.write() {
+            *tm = mode;
+        }
     }
 
     pub fn is_running(&self) -> bool {

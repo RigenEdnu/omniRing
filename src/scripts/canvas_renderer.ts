@@ -32,35 +32,82 @@ export interface RingConfig {
 
 export const DEFAULT_RING_CONFIG: RingConfig = {
   profile_name: "Default Global",
-  inner_radius: 50,
-  outer_radius: 140,
+  inner_radius: 26,
+  outer_radius: 200,
   slices: [
     {
-      id: "slice_copy",
-      label: "Copy",
-      icon: "copy",
-      action: { type: "Shortcut", keys: ["Control", "c"] },
+      id: "slice_play_pause",
+      label: "Play/Pause",
+      icon: "play-pause",
+      action: { type: "Shortcut", keys: ["MediaPlayPause"] },
     },
     {
-      id: "slice_paste",
-      label: "Paste",
-      icon: "clipboard",
-      action: { type: "Shortcut", keys: ["Control", "v"] },
+      id: "slice_new_note",
+      label: "New note",
+      icon: "new-note",
+      action: { type: "Shortcut", keys: ["Control", "n"] },
     },
     {
-      id: "slice_undo",
-      label: "Undo",
-      icon: "arrow-undo",
-      action: { type: "Shortcut", keys: ["Control", "z"] },
+      id: "slice_explore_ai",
+      label: "Explore AI",
+      icon: "sparkles",
+      action: { type: "OpenUrl", url: "https://chatgpt.com" },
     },
     {
-      id: "slice_redo",
-      label: "Redo",
-      icon: "arrow-redo",
-      action: { type: "Shortcut", keys: ["Control", "y"] },
+      id: "slice_lock",
+      label: "Lock workstation",
+      icon: "lock",
+      action: { type: "Shortcut", keys: ["Meta", "l"] },
+    },
+    {
+      id: "slice_options",
+      label: "Settings",
+      icon: "options",
+      action: { type: "OpenApp", command: "ms-settings:" },
+    },
+    {
+      id: "slice_screenshot",
+      label: "Screenshot",
+      icon: "screenshot",
+      action: { type: "Shortcut", keys: ["Meta", "Shift", "s"] },
+    },
+    {
+      id: "slice_emoji",
+      label: "Emoji",
+      icon: "emoji",
+      action: { type: "Shortcut", keys: ["Meta", "."] },
+    },
+    {
+      id: "slice_finder",
+      label: "Files",
+      icon: "folder",
+      action: { type: "Shortcut", keys: ["Meta", "e"] },
     },
   ],
 };
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+): void {
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, width, height, radius);
+  } else {
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+  }
+}
 
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement;
@@ -72,7 +119,15 @@ export class CanvasRenderer {
   private activeSliceIndex: number = -1;
   private cursorX: number | null = null;
   private cursorY: number | null = null;
-  private outerTolerance: number = 60;
+
+  // Geometry parameters for Logitech Options+ Bubble UI
+  public readonly hubRadius: number = 22;
+  public readonly centerDeadzone: number = 26;
+  public readonly nodeOrbitalRadius: number = 95;
+  public readonly nodeRadius: number = 24;
+  public readonly labelOrbitalRadius: number = 175;
+  public readonly outerToleranceLimit: number = 240;
+
   private animProgress: number = 1.0;
   private animFrameId: number | null = null;
 
@@ -141,8 +196,8 @@ export class CanvasRenderer {
     this.activeSliceIndex = -1;
   }
 
-  public setActiveSlice(index: number): void {
-    this.activeSliceIndex = index;
+  public setActiveSlice(index: number | null): void {
+    this.activeSliceIndex = index === null ? -1 : index;
   }
 
   public getActiveSlice(): number {
@@ -175,6 +230,15 @@ export class CanvasRenderer {
   }
 
   /**
+   * Helper to determine if cursor coordinate is within center dismiss hub.
+   */
+  public isCenterHub(x: number, y: number, isRelative: boolean = false): boolean {
+    const dx = isRelative ? x : x - this.centerX;
+    const dy = isRelative ? y : y - this.centerY;
+    return Math.hypot(dx, dy) <= this.centerDeadzone;
+  }
+
+  /**
    * Calculates the slice angles for N slices.
    * Slice 0 is centered on top (-PI/2), corresponding to an Up gesture.
    */
@@ -198,8 +262,8 @@ export class CanvasRenderer {
   }
 
   /**
-   * Hit test a coordinate (r, theta) against the radial slices.
-   * Returns slice index (0..n-1), or -1 if in dead zone (< inner_radius) or out of outer bound.
+   * Hit test a coordinate (r, theta) adhering to Fitts's Law polar angles.
+   * Returns slice index (0..n-1), or -1 if in center deadzone (< 26px) or beyond outer tolerance.
    */
   public hitTest(x: number, y: number, isRelative: boolean = false): number {
     const slices = this.getCurrentSlices();
@@ -210,13 +274,13 @@ export class CanvasRenderer {
     const dy = isRelative ? y : y - this.centerY;
     const r = Math.hypot(dx, dy);
 
-    // Dead zone check (inside inner radius)
-    if (r < this.config.inner_radius) {
+    // Dead zone check (inside center dismiss hub)
+    if (r < this.centerDeadzone) {
       return -1;
     }
 
-    // Outer boundary check with tolerance
-    if (r > this.config.outer_radius + this.outerTolerance) {
+    // Outer boundary check
+    if (r > this.outerToleranceLimit) {
       return -1;
     }
 
@@ -270,7 +334,7 @@ export class CanvasRenderer {
   }
 
   /**
-   * Renders the radial menu overlay on canvas.
+   * Renders the Logitech Options+ Bubble Nodes radial menu overlay on canvas.
    */
   public render(): void {
     const ctx = this.ctx;
@@ -282,147 +346,178 @@ export class CanvasRenderer {
 
     ctx.save();
 
-    // Apply scale and opacity animation if active
+    // Apply scale and opacity animation if opening
     if (this.animProgress < 1.0) {
       ctx.translate(this.centerX, this.centerY);
-      const scale = 0.8 + 0.2 * this.animProgress;
+      const scale = 0.85 + 0.15 * this.animProgress;
       ctx.scale(scale, scale);
       ctx.translate(-this.centerX, -this.centerY);
       ctx.globalAlpha = this.animProgress;
     }
 
-    const innerR = this.config.inner_radius;
-    const outerR = this.config.outer_radius;
+    // 1. Draw subtle connecting guideline / orbital ring
+    ctx.beginPath();
+    ctx.arc(this.centerX, this.centerY, this.nodeOrbitalRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.06)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-    // Draw slices
+    // 2. Draw 8 Floating Pill Badges (outer orbital radius 175px)
     for (let i = 0; i < n; i++) {
-      const { start, end } = this.getSliceAngles(i);
+      const { mid } = this.getSliceAngles(i);
+      const slice = slices[i];
       const isActive = i === this.activeSliceIndex;
 
-      // Annular sector path
+      const badgeX = this.centerX + this.labelOrbitalRadius * Math.cos(mid);
+      const badgeY = this.centerY + this.labelOrbitalRadius * Math.sin(mid);
+
+      ctx.save();
+      ctx.font = isActive
+        ? "600 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        : "500 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+      const textWidth = ctx.measureText(slice.label).width;
+      const pillWidth = Math.max(64, textWidth + 22);
+      const pillHeight = 26;
+      const pillRadius = 6;
+      const rectX = badgeX - pillWidth / 2;
+      const rectY = badgeY - pillHeight / 2;
+
+      // Draw pill background with drop shadow
       ctx.beginPath();
-      ctx.arc(this.centerX, this.centerY, outerR, start, end, false);
-      ctx.arc(this.centerX, this.centerY, innerR, end, start, true);
-      ctx.closePath();
+      drawRoundedRect(ctx, rectX, rectY, pillWidth, pillHeight, pillRadius);
 
       if (isActive) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.85)";
-        ctx.shadowColor = "rgba(59, 130, 246, 0.6)";
+        ctx.fillStyle = "#18181b";
+        ctx.shadowColor = "rgba(94, 72, 232, 0.35)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "#5E48E8";
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.12)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Draw pill label text
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = isActive ? "#ffffff" : "#18181b";
+      ctx.fillText(slice.label, badgeX, badgeY + 0.5);
+      ctx.restore();
+    }
+
+    // 3. Draw 8 Action Bubble Nodes (inner orbital radius 95px)
+    for (let i = 0; i < n; i++) {
+      const { mid } = this.getSliceAngles(i);
+      const slice = slices[i];
+      const isActive = i === this.activeSliceIndex;
+
+      const nodeX = this.centerX + this.nodeOrbitalRadius * Math.cos(mid);
+      const nodeY = this.centerY + this.nodeOrbitalRadius * Math.sin(mid);
+      const radius = isActive ? this.nodeRadius * 1.12 : this.nodeRadius;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(nodeX, nodeY, radius, 0, Math.PI * 2);
+
+      if (isActive) {
+        // High-contrast active bubble node with accent glow
+        ctx.fillStyle = "#111827";
+        ctx.shadowColor = "rgba(94, 72, 232, 0.65)";
         ctx.shadowBlur = 16;
         ctx.fill();
 
         ctx.lineWidth = 2.5;
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.strokeStyle = "#5E48E8";
         ctx.stroke();
-
-        ctx.shadowBlur = 0;
       } else {
-        ctx.fillStyle = "rgba(20, 24, 34, 0.85)";
+        // Inactive dark circular node with subtle elevation shadow
+        ctx.fillStyle = "#18181b";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 2;
         ctx.fill();
 
         ctx.lineWidth = 1;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
         ctx.stroke();
       }
+      ctx.restore();
+
+      // Render crisp white vector icon inside the node
+      if (slice.icon) {
+        this.drawVectorIcon(ctx, slice.icon, nodeX, nodeY, isActive);
+      }
     }
 
-    // Draw separator lines between slices
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
-    for (let i = 0; i < n; i++) {
-      const { start } = this.getSliceAngles(i);
-      const x1 = this.centerX + innerR * Math.cos(start);
-      const y1 = this.centerY + innerR * Math.sin(start);
-      const x2 = this.centerX + outerR * Math.cos(start);
-      const y2 = this.centerY + outerR * Math.sin(start);
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-
-    // Draw inner hub (center circle)
+    // 4. Draw Center Dismiss Hub (r = 22px) with '×' glyph
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(this.centerX, this.centerY, innerR, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(15, 18, 26, 0.94)";
+    ctx.arc(this.centerX, this.centerY, this.hubRadius, 0, Math.PI * 2);
+
+    const isCursorInHub = this.cursorX !== null && this.cursorY !== null && this.isCenterHub(this.cursorX, this.cursorY);
+    ctx.fillStyle = isCursorInHub ? "#e2e8f0" : "#f1f5f9";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.1)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 1;
     ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = isCursorInHub ? "#94a3b8" : "#cbd5e1";
     ctx.stroke();
 
     if (this.currentRingId !== "root") {
-      ctx.save();
+      // Submenu back indicator
       ctx.font = "600 11px system-ui, -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "rgba(147, 197, 253, 0.9)";
+      ctx.fillStyle = "#334155";
       ctx.fillText("Back", this.centerX, this.centerY);
-      ctx.restore();
     } else {
-      // Center indicator dot
+      // Central dismiss cross '×'
+      const crossSize = 5;
       ctx.beginPath();
-      ctx.arc(this.centerX, this.centerY, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = this.activeSliceIndex >= 0 ? "rgba(96, 165, 250, 0.9)" : "rgba(255, 255, 255, 0.5)";
-      ctx.fill();
+      ctx.moveTo(this.centerX - crossSize, this.centerY - crossSize);
+      ctx.lineTo(this.centerX + crossSize, this.centerY + crossSize);
+      ctx.moveTo(this.centerX + crossSize, this.centerY - crossSize);
+      ctx.lineTo(this.centerX - crossSize, this.centerY + crossSize);
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = isCursorInHub ? "#0f172a" : "#475569";
+      ctx.lineCap = "round";
+      ctx.stroke();
     }
+    ctx.restore();
 
-    // Draw slice labels and icons
-    const midR = (innerR + outerR) / 2;
-    for (let i = 0; i < n; i++) {
-      const { mid } = this.getSliceAngles(i);
-      const slice = slices[i];
-      const isActive = i === this.activeSliceIndex;
-
-      const itemX = this.centerX + midR * Math.cos(mid);
-      const itemY = this.centerY + midR * Math.sin(mid);
-
-      const hasIcon = Boolean(slice.icon);
-      const iconY = hasIcon ? itemY - 7 : itemY;
-      const textY = hasIcon ? itemY + 16 : itemY + 4;
-
-      if (hasIcon && slice.icon) {
-        this.drawVectorIcon(ctx, slice.icon, itemX, iconY, isActive);
-      }
-
-      // Slice label text
+    // 5. Draw subtle cursor bead if cursor is tracking
+    if (this.cursorX !== null && this.cursorY !== null && !isCursorInHub) {
       ctx.save();
-      ctx.font = isActive
-        ? "600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-        : "500 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = isActive ? "#ffffff" : "rgba(240, 243, 246, 0.88)";
-      if (isActive) {
-        ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
-        ctx.shadowBlur = 4;
-      }
-      ctx.fillText(slice.label, itemX, textY);
+      ctx.beginPath();
+      ctx.arc(this.cursorX, this.cursorY, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(94, 72, 232, 0.85)";
+      ctx.shadowColor = "rgba(94, 72, 232, 0.6)";
+      ctx.shadowBlur = 6;
+      ctx.fill();
       ctx.restore();
-    }
-
-    // Draw cursor indicator bead if cursor position is tracked
-    if (this.cursorX !== null && this.cursorY !== null) {
-      const cdx = this.cursorX - this.centerX;
-      const cdy = this.cursorY - this.centerY;
-      const dist = Math.hypot(cdx, cdy);
-
-      if (dist >= innerR) {
-        ctx.beginPath();
-        ctx.arc(this.cursorX, this.cursorY, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.shadowColor = "rgba(96, 165, 250, 0.8)";
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
     }
 
     ctx.restore();
   }
 
   /**
-   * Crisp vector icon renderer for common radial actions.
+   * Crisp vector icon renderer with 2px stroke matching Logitech Options+.
    */
   private drawVectorIcon(
     ctx: CanvasRenderingContext2D,
@@ -433,15 +528,120 @@ export class CanvasRenderer {
   ): void {
     ctx.save();
     ctx.translate(x, y);
-    ctx.strokeStyle = isActive ? "#ffffff" : "rgba(255, 255, 255, 0.85)";
-    ctx.fillStyle = isActive ? "#ffffff" : "rgba(255, 255, 255, 0.85)";
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff";
+    ctx.lineWidth = isActive ? 2.2 : 1.8;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     const name = iconName.toLowerCase();
 
     switch (name) {
+      case "play":
+      case "play-pause": {
+        // Rightward playback triangle
+        ctx.beginPath();
+        ctx.moveTo(-4, -6);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(-4, 6);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "note":
+      case "new-note": {
+        // Notepad with diagonal pencil
+        ctx.strokeRect(-5, -6, 9, 12);
+        ctx.beginPath();
+        ctx.moveTo(1, -7);
+        ctx.lineTo(6, -2);
+        ctx.stroke();
+        break;
+      }
+      case "sparkles":
+      case "ai":
+      case "explore-ai": {
+        // Multi-point sparkles
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.quadraticCurveTo(0, 0, 7, 0);
+        ctx.quadraticCurveTo(0, 0, 0, 7);
+        ctx.quadraticCurveTo(0, 0, -7, 0);
+        ctx.quadraticCurveTo(0, 0, 0, -7);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "lock":
+      case "lock-workstation": {
+        // Padlock
+        ctx.beginPath();
+        ctx.arc(0, -3, 4.5, Math.PI, 0, false);
+        ctx.stroke();
+        ctx.strokeRect(-6, -1, 12, 8);
+        break;
+      }
+      case "options":
+      case "settings":
+      case "gear": {
+        // Options / settings sliders
+        ctx.beginPath();
+        ctx.moveTo(-6, -4);
+        ctx.lineTo(6, -4);
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(6, 0);
+        ctx.moveTo(-6, 4);
+        ctx.lineTo(6, 4);
+        ctx.stroke();
+        // Slider knobs
+        ctx.beginPath();
+        ctx.arc(-2, -4, 2, 0, Math.PI * 2);
+        ctx.arc(2, 0, 2, 0, Math.PI * 2);
+        ctx.arc(-3, 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case "screenshot":
+      case "camera": {
+        // Dashed capture frame with crosshair
+        ctx.strokeRect(-6, -5, 12, 10);
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case "emoji":
+      case "smile": {
+        // Smiley face
+        ctx.beginPath();
+        ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.stroke();
+        // Eyes
+        ctx.beginPath();
+        ctx.arc(-2.5, -2, 1, 0, Math.PI * 2);
+        ctx.arc(2.5, -2, 1, 0, Math.PI * 2);
+        ctx.fill();
+        // Smile curve
+        ctx.beginPath();
+        ctx.arc(0, 1, 3.5, 0.2 * Math.PI, 0.8 * Math.PI, false);
+        ctx.stroke();
+        break;
+      }
+      case "files":
+      case "folder":
+      case "finder": {
+        // Folder icon
+        ctx.beginPath();
+        ctx.moveTo(-7, -4);
+        ctx.lineTo(-2, -4);
+        ctx.lineTo(0, -2);
+        ctx.lineTo(7, -2);
+        ctx.lineTo(7, 5);
+        ctx.lineTo(-7, 5);
+        ctx.closePath();
+        ctx.stroke();
+        break;
+      }
       case "copy": {
         ctx.strokeRect(-2, -6, 8, 9);
         ctx.strokeRect(-6, -3, 8, 9);
@@ -522,7 +722,7 @@ export class CanvasRenderer {
       default: {
         ctx.beginPath();
         ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.fill();
         break;
       }
     }

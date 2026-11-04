@@ -10,6 +10,7 @@ use tauri::{
 };
 
 /// Menu item identifier constants.
+pub const MENU_ID_OPEN_CONFIGURATOR: &str = "open_configurator";
 pub const MENU_ID_OPEN_CONFIG: &str = "open_config";
 pub const MENU_ID_RELOAD_PROFILES: &str = "reload_profiles";
 pub const MENU_ID_TOGGLE_ENABLED: &str = "toggle_enabled";
@@ -33,6 +34,8 @@ impl Default for AppTrayState {
 pub fn build_tray_menu<R: Runtime, M: Manager<R>>(
     manager: &M,
 ) -> tauri::Result<(Menu<R>, CheckMenuItem<R>)> {
+    let open_configurator = MenuItemBuilder::with_id(MENU_ID_OPEN_CONFIGURATOR, "Configure OmniRing")
+        .build(manager)?;
     let open_config = MenuItemBuilder::with_id(MENU_ID_OPEN_CONFIG, "Open Config Folder")
         .build(manager)?;
     let reload_profiles =
@@ -43,6 +46,8 @@ pub fn build_tray_menu<R: Runtime, M: Manager<R>>(
     let exit = MenuItemBuilder::with_id(MENU_ID_EXIT, "Exit").build(manager)?;
 
     let menu = MenuBuilder::new(manager)
+        .item(&open_configurator)
+        .separator()
         .item(&open_config)
         .item(&reload_profiles)
         .separator()
@@ -72,14 +77,14 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
         .on_menu_event(|app_handle, event| {
             handle_tray_menu_event(app_handle, event.id().as_ref());
         })
-        .on_tray_icon_event(|_tray, event| {
+        .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::DoubleClick {
                 button: MouseButton::Left,
                 ..
             } = event
             {
-                // Double-clicking tray icon opens the config folder
-                let _ = open_config_folder();
+                // Double-clicking tray icon opens the configurator window
+                let _ = open_configurator_window(tray.app_handle());
             }
         });
 
@@ -95,6 +100,11 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
 /// Dispatches actions triggered by tray menu item activations.
 pub fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
     match menu_id {
+        MENU_ID_OPEN_CONFIGURATOR => {
+            if let Err(e) = open_configurator_window(app) {
+                eprintln!("Warning: Failed to open configurator window: {}", e);
+            }
+        }
         MENU_ID_OPEN_CONFIG => {
             if let Err(e) = open_config_folder() {
                 eprintln!("Warning: Failed to open config folder: {}", e);
@@ -124,6 +134,18 @@ pub fn handle_tray_menu_event<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
             app.exit(0);
         }
         _ => {}
+    }
+}
+
+/// Shows and focuses the configurator desktop window.
+pub fn open_configurator_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("configurator") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+        Ok(())
+    } else {
+        Err("Configurator window not found".to_string())
     }
 }
 
@@ -268,6 +290,7 @@ mod tests {
 
     #[test]
     fn test_tray_menu_ids() {
+        assert_eq!(MENU_ID_OPEN_CONFIGURATOR, "open_configurator");
         assert_eq!(MENU_ID_OPEN_CONFIG, "open_config");
         assert_eq!(MENU_ID_RELOAD_PROFILES, "reload_profiles");
         assert_eq!(MENU_ID_TOGGLE_ENABLED, "toggle_enabled");

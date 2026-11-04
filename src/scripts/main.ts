@@ -152,6 +152,26 @@ window.addEventListener("DOMContentLoaded", async () => {
       const releaseData = resolveReleasePayload(event.payload);
       console.log("Radial menu release received:", releaseData);
 
+      // Check if cursor was released on center dismiss hub
+      let isHubDismiss = false;
+      if (releaseData && activePlacement) {
+        const dx = releaseData.current_x - activePlacement.center_x;
+        const dy = releaseData.current_y - activePlacement.center_y;
+        const canvasX = activePlacement.relative_center_x + dx;
+        const canvasY = activePlacement.relative_center_y + dy;
+        isHubDismiss = renderer.isCenterHub(canvasX, canvasY);
+      }
+
+      if (isHubDismiss) {
+        console.log("[Center Hub Dismiss] Dismissed overlay via center cancel hub");
+        try {
+          await invoke("hide_overlay");
+        } catch (_) {}
+        activePlacement = null;
+        renderer.clear();
+        return;
+      }
+
       const confirmedSlice: SliceConfig | null = renderer.getActiveSliceData();
       const confirmedIndex = renderer.getActiveSlice();
 
@@ -167,11 +187,19 @@ window.addEventListener("DOMContentLoaded", async () => {
           }
         } else {
           // Terminal action (Shortcut, TypeText, OpenApp, OpenUrl, Sequence)
+          // Auto-close overlay window instantly before executing terminal slice action
+          try {
+            await invoke("hide_overlay");
+          } catch (_) {}
+          activePlacement = null;
+          renderer.clear();
+
           try {
             await invoke("execute_action", { action: confirmedSlice.action });
           } catch (err) {
             console.error("Failed to execute action:", err);
           }
+          return;
         }
       } else {
         // Deadzone release: if inside a submenu, return to root ring instead of closing
@@ -183,7 +211,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         console.log("[Slice Released in Deadzone] No action triggered");
       }
 
-      // Hide overlay for terminal actions or root deadzone release
+      // Hide overlay for root deadzone release
       try {
         await invoke("hide_overlay");
       } catch (_) {}
@@ -266,23 +294,83 @@ window.addEventListener("DOMContentLoaded", async () => {
     renderer.render();
   });
 
-  canvas.addEventListener("mouseup", async () => {
+  canvas.addEventListener("mouseup", async (e: MouseEvent) => {
     if (!renderer) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if clicked center dismiss hub (×)
+    if (renderer.isCenterHub(x, y)) {
+      console.log("[Center Hub Clicked] Dismissing overlay");
+      try {
+        await invoke("hide_overlay");
+      } catch (_) {}
+      renderer.clear();
+      activePlacement = null;
+      return;
+    }
+
     const confirmed = renderer.getActiveSliceData();
     if (confirmed && confirmed.action) {
       console.log("[Browser Click Confirmed]:", confirmed.label, confirmed.action);
       if (confirmed.action.type === "Submenu") {
         renderer.switchToRing(confirmed.action.target_ring_id || "root");
       } else {
+        // Auto-close instantly before action execution
+        try {
+          await invoke("hide_overlay");
+        } catch (_) {}
+        renderer.clear();
+        activePlacement = null;
+
         try {
           await invoke("execute_action", { action: confirmed.action });
         } catch (_) {}
+        return;
       }
     } else {
       if (renderer.getActiveRingId() !== "root") {
         renderer.resetToRoot();
         renderer.openWithAnimation(60);
+        return;
       }
+      try {
+        await invoke("hide_overlay");
+      } catch (_) {}
+      renderer.clear();
+      activePlacement = null;
+    }
+  });
+
+  // Escape key dismiss handling within webview
+  window.addEventListener("keydown", async (e: KeyboardEvent) => {
+    if (e.key === "Escape" || e.code === "Escape") {
+      console.log("[Escape Key Dismiss]");
+      e.preventDefault();
+      try {
+        await invoke("hide_overlay");
+      } catch (_) {}
+      renderer?.clear();
+      activePlacement = null;
+    }
+  });
+
+  // Outside click auto-close in webview fallback
+  window.addEventListener("pointerdown", async (e: PointerEvent) => {
+    if (!renderer) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const center = renderer.getCenter();
+    const dist = Math.hypot(x - center.x, y - center.y);
+    if (dist > 220) {
+      console.log("[Outside Click in Webview] Dismissing overlay");
+      try {
+        await invoke("hide_overlay");
+      } catch (_) {}
+      renderer.clear();
+      activePlacement = null;
     }
   });
 
@@ -293,6 +381,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 // App & Tray control helpers callable from frontend
 export async function openConfigFolder(): Promise<void> {
   return await invoke("open_config_folder");
+}
+
+export async function openConfiguratorWindow(): Promise<void> {
+  return await invoke("open_configurator_window");
 }
 
 export async function isOmniEnabled(): Promise<boolean> {

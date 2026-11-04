@@ -49,9 +49,48 @@ fn show_overlay(
 }
 
 #[tauri::command]
-fn hide_overlay(window: WebviewWindow) -> Result<(), String> {
+fn hide_overlay(
+    window: WebviewWindow,
+    hook_state: State<'_, AppHookState>,
+) -> Result<(), String> {
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     window::manager::hide_overlay(hwnd);
+    if let Ok(lock) = hook_state.worker.lock() {
+        if let Some(worker) = lock.as_ref() {
+            worker.set_radial_active(false, 0, 0, 0);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_trigger_mode(
+    hook_state: State<'_, AppHookState>,
+) -> Result<hook::TriggerMode, String> {
+    if let Ok(lock) = hook_state.worker.lock() {
+        if let Some(worker) = lock.as_ref() {
+            return Ok(worker.trigger_mode());
+        }
+    }
+    Err("Hook worker is not running".to_string())
+}
+
+#[tauri::command]
+fn set_trigger_mode(
+    mode: hook::TriggerMode,
+    hook_state: State<'_, AppHookState>,
+    gesture_state: State<'_, AppGestureState>,
+) -> Result<(), String> {
+    if let Ok(lock) = hook_state.worker.lock() {
+        if let Some(worker) = lock.as_ref() {
+            worker.set_trigger_mode(mode.clone());
+        }
+    }
+    if let Ok(lock) = gesture_state.worker.lock() {
+        if let Some(worker) = lock.as_ref() {
+            worker.set_trigger_mode(mode);
+        }
+    }
     Ok(())
 }
 
@@ -111,6 +150,7 @@ fn get_gesture_status(state: State<'_, AppGestureState>) -> bool {
 fn set_hook_trigger_button(
     button_name: String,
     hook_state: State<'_, AppHookState>,
+    gesture_state: State<'_, AppGestureState>,
 ) -> Result<(), String> {
     let button = match button_name.to_lowercase().as_str() {
         "x1" | "back" | "mouse4" => hook::MouseButton::X1,
@@ -121,13 +161,22 @@ fn set_hook_trigger_button(
         _ => return Err(format!("Unknown mouse button: {}", button_name)),
     };
 
+    let mode = hook::TriggerMode::Hold {
+        button,
+        hold_ms: 150,
+    };
+
     if let Ok(lock) = hook_state.worker.lock() {
         if let Some(worker) = lock.as_ref() {
-            worker.set_trigger_button(button);
-            return Ok(());
+            worker.set_trigger_mode(mode.clone());
         }
     }
-    Err("Hook worker is not running".to_string())
+    if let Ok(lock) = gesture_state.worker.lock() {
+        if let Some(worker) = lock.as_ref() {
+            worker.set_trigger_mode(mode);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -168,6 +217,11 @@ fn reload_profiles(
 #[tauri::command]
 fn open_config_folder() -> Result<(), String> {
     tray::open_config_folder()
+}
+
+#[tauri::command]
+fn open_configurator_window(app: tauri::AppHandle) -> Result<(), String> {
+    tray::open_configurator_window(&app)
 }
 
 #[tauri::command]
@@ -219,6 +273,29 @@ fn list_available_profiles(
 ) -> Result<Vec<profile::ProfileConfig>, String> {
     let mgr = state.manager.read().map_err(|e| e.to_string())?;
     Ok(mgr.list_profiles().to_vec())
+}
+
+#[tauri::command]
+fn save_profile(
+    profile: profile::ProfileConfig,
+    state: State<'_, AppProfileState>,
+    app: tauri::AppHandle,
+) -> Result<profile::ProfileConfig, String> {
+    let mut mgr = state.manager.write().map_err(|e| e.to_string())?;
+    mgr.save_profile(&profile)?;
+
+    if let Ok(mut active) = state.active_profile.write() {
+        if active.profile_name == profile.profile_name {
+            *active = profile.clone();
+        }
+    }
+
+    let _ = app.emit("omniring://profile-changed", &profile);
+    if let Some(overlay_win) = app.get_webview_window("overlay") {
+        let _ = overlay_win.emit("omniring://profile-changed", &profile);
+    }
+
+    Ok(profile)
 }
 
 #[tauri::command]
@@ -330,6 +407,18 @@ fn handle_gesture_event(app_handle: &tauri::AppHandle, event: gesture::GestureEv
                         600,
                     ) {
                         Ok(placement) => {
+                            if let Some(h_state) = app_handle.try_state::<AppHookState>() {
+                                if let Ok(lock) = h_state.worker.lock() {
+                                    if let Some(worker) = lock.as_ref() {
+                                        worker.set_radial_active(
+                                            true,
+                                            placement.center_x,
+                                            placement.center_y,
+                                            r,
+                                        );
+                                    }
+                                }
+                            }
                             let _ = overlay_win.emit("omniring://radial-open", &placement);
                             return;
                         }
@@ -347,6 +436,13 @@ fn handle_gesture_event(app_handle: &tauri::AppHandle, event: gesture::GestureEv
             }
         }
         gesture::GestureEvent::RadialRelease { .. } => {
+            if let Some(h_state) = app_handle.try_state::<AppHookState>() {
+                if let Ok(lock) = h_state.worker.lock() {
+                    if let Some(worker) = lock.as_ref() {
+                        worker.set_radial_active(false, 0, 0, 0);
+                    }
+                }
+            }
             if let Some(overlay_win) = app_handle.get_webview_window("overlay") {
                 let _ = overlay_win.emit("omniring://radial-release", &event);
             }
@@ -360,6 +456,13 @@ fn handle_gesture_event(app_handle: &tauri::AppHandle, event: gesture::GestureEv
             let _ = app_handle.emit("omniring://tap", &event);
         }
         gesture::GestureEvent::Cancelled => {
+            if let Some(h_state) = app_handle.try_state::<AppHookState>() {
+                if let Ok(lock) = h_state.worker.lock() {
+                    if let Some(worker) = lock.as_ref() {
+                        worker.set_radial_active(false, 0, 0, 0);
+                    }
+                }
+            }
             if let Some(overlay_win) = app_handle.get_webview_window("overlay") {
                 if let Ok(hwnd) = overlay_win.hwnd() {
                     window::manager::hide_overlay(hwnd);
@@ -438,7 +541,7 @@ pub fn run() {
             }
 
             let default_config = hook::HookConfig::default();
-            let trigger_btn = default_config.trigger_button;
+            let trigger_mode = default_config.trigger_mode.clone();
 
             // Start low-level mouse hook worker thread
             match hook::HookWorker::start(default_config) {
@@ -456,7 +559,7 @@ pub fn run() {
                     match gesture::GestureWorker::start(
                         hook_rx,
                         gesture::GestureConfig::default(),
-                        trigger_btn,
+                        trigger_mode,
                         move |event| {
                             handle_gesture_event(&app_handle, event);
                         },
@@ -485,6 +588,8 @@ pub fn run() {
             hide_overlay,
             get_hook_status,
             get_gesture_status,
+            get_trigger_mode,
+            set_trigger_mode,
             set_hook_trigger_button,
             set_hook_suppress,
             get_cursor_position,
@@ -495,9 +600,11 @@ pub fn run() {
             reload_profiles,
             set_active_profile_by_name,
             list_available_profiles,
+            save_profile,
             execute_action,
             execute_slice_action,
             open_config_folder,
+            open_configurator_window,
             is_omni_enabled,
             toggle_omni_enabled,
             set_omni_enabled,
