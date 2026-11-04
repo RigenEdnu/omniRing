@@ -8,6 +8,20 @@
 
 ## Log Eksekusi Milestone
 
+### [Peningkatan CI / GitHub Actions] Pengunggahan Otomatis Log Error saat Build Gagal (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Penambahan direktori `logs/` dan pengaliran output (`2>&1 | tee`) untuk seluruh tahap build:
+     - `logs/npm-install.log`
+     - `logs/typecheck.log`
+     - `logs/frontend-build.log`
+     - `logs/cargo-check.log`
+     - `logs/tauri-build.log`
+  2. Penambahan step `Upload Error Logs` menggunakan `actions/upload-artifact@v4` dengan kondisi `if: failure()`, sehingga ketika terjadi kegagalan di salah satu tahap build, seluruh log error otomatis diarsipkan ke artifact `build-error-logs`.
+  3. Konfigurasi `RUST_BACKTRACE: 1` pada environment job untuk backtrace lengkap jika terjadi panic pada toolchain Rust.
+- **Hasil Verifikasi**:
+  - Konfigurasi workflow `.github/workflows/build.yml` tervalidasi bersih.
+  - Verifikasi pipeline lokal bash dan `npm run build` berjalan sukses.
+
 ### [Perbaikan CI / Cargo Check] Penyelarasan Dependensi `windows` Crate ke `0.62` (Selesai)
 - **Aktivitas yang Diselesaikan**:
   1. Penyelarasan versi crate `windows` di `src-tauri/Cargo.toml` dari `0.58` ke `0.62` agar sesuai dengan dependensi `windows` (`0.62.2`) yang ditarik oleh Tauri v2.12+ pada CI GitHub Actions runner.

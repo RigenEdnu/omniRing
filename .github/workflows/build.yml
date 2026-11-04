@@ -10,6 +10,8 @@ on:
 jobs:
   check-and-build:
     runs-on: windows-latest
+    env:
+      RUST_BACKTRACE: 1
 
     steps:
       - name: Checkout repository
@@ -30,22 +32,31 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      - name: Create logs directory
+        run: mkdir -p logs
+        shell: bash
+
       - name: Install Frontend Dependencies
-        run: npm install
+        run: npm install 2>&1 | tee logs/npm-install.log
+        shell: bash
 
       - name: Typecheck Frontend
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit 2>&1 | tee logs/typecheck.log
+        shell: bash
 
       - name: Build Frontend
-        run: npm run build
+        run: npm run build 2>&1 | tee logs/frontend-build.log
+        shell: bash
 
       - name: Cargo Check
         run: |
           cd src-tauri
-          cargo check --verbose
+          cargo check --verbose 2>&1 | tee ../logs/cargo-check.log
+        shell: bash
 
       - name: Build Tauri App
-        run: npx tauri build --no-bundle
+        run: npx tauri build --no-bundle 2>&1 | tee logs/tauri-build.log
+        shell: bash
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -54,4 +65,12 @@ jobs:
           path: |
             src-tauri/target/release/*.exe
             src-tauri/target/release/*.dll
+          if-no-files-found: warn
+
+      - name: Upload Error Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-error-logs
+          path: logs/
           if-no-files-found: warn
