@@ -8,6 +8,21 @@
 
 ## Log Eksekusi Milestone
 
+### [Perbaikan CI / Cargo Check] Resolusi Macro Namespace Tauri Command & Parameter SetWindowPos Windows Crate v0.62 (Selesai)
+- **Aktivitas yang Diselesaikan**:
+  1. Identifikasi dan perbaikan akar penyebab error E0255 (`__cmd__* is defined multiple times`) pada `src-tauri/src/lib.rs`:
+     - Berdasarkan dokumentasi resmi Tauri v2, perintah yang dianotasi dengan `#[tauri::command]` di dalam `src/lib.rs` tidak boleh berstatus `pub` karena macro generator menghasilkan `pub use __cmd__<name>;` yang menyebabkan tabrakan namespace pada module root.
+     - Mengubah seluruh 21 fungsi handler Tauri command dari `pub fn` menjadi `fn` tingkat modul (`show_overlay`, `hide_overlay`, `get_cursor_position`, `get_monitor_geometry`, `calculate_clamped_placement`, `get_hook_status`, `get_gesture_status`, `set_hook_trigger_button`, `set_hook_suppress`, `get_active_profile`, `get_foreground_process`, `reload_profiles`, `open_config_folder`, `is_omni_enabled`, `toggle_omni_enabled`, `set_omni_enabled`, `exit_app`, `set_active_profile_by_name`, `list_available_profiles`, `execute_action`, `execute_slice_action`). Entry point `pub fn run()` tetap dipertahankan sebagai fungsi publik.
+  2. Perbaikan error E0308 (mismatched types) pada `src-tauri/src/window/manager.rs`:
+     - Menyelaraskan pemanggilan Win32 API `SetWindowPos` dengan Windows crate v0.62: parameter `hwndinsertafter` membutuhkan tipe `Option<HWND>` (bukan raw `HWND`).
+     - Membungkus argumen `HWND_TOPMOST` menjadi `Some(HWND_TOPMOST)` pada baris 224 (`apply_overlay_styles`) dan baris 259 (`show_overlay_clamped`).
+  3. Pembersihan warning compiler pada Rust backend:
+     - Menghapus import `POINT` dan `HHOOK` yang tidak terpakai di `src-tauri/src/hook/worker.rs`.
+     - Menghapus daftar import konstanta `VK_*` yang tidak terpakai di `src-tauri/src/action/dispatcher.rs`.
+- **Hasil Verifikasi**:
+  - `npm run build` (`tsc && vite build`) sukses mengompilasi TypeScript dan mem-bundle aset web (0 error, 0 warning).
+  - Inspeksi statis kode memvalidasi seluruh simbol macro Tauri v2 dan tipe parameter Win32 API telah sinkron 100% dan siap untuk verifikasi build di runner CI GitHub Actions.
+
 ### [Peningkatan CI / GitHub Actions] Pengunggahan Otomatis Log Error saat Build Gagal (Selesai)
 - **Aktivitas yang Diselesaikan**:
   1. Penambahan direktori `logs/` dan pengaliran output (`2>&1 | tee`) untuk seluruh tahap build:

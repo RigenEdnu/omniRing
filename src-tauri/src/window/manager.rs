@@ -221,7 +221,7 @@ pub fn apply_overlay_styles(hwnd: HWND) -> WinResult<()> {
             // Refresh window frame styles without activating
             SetWindowPos(
                 hwnd,
-                HWND_TOPMOST,
+                Some(HWND_TOPMOST),
                 0,
                 0,
                 0,
@@ -256,7 +256,7 @@ pub fn show_overlay_clamped(
     unsafe {
         SetWindowPos(
             hwnd,
-            HWND_TOPMOST,
+            Some(HWND_TOPMOST),
             placement.window_x,
             placement.window_y,
             placement.window_width,

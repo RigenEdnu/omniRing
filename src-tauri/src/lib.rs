@@ -27,7 +27,7 @@ pub struct AppProfileState {
 }
 
 #[tauri::command]
-pub fn show_overlay(
+fn show_overlay(
     window: WebviewWindow,
     center_x: i32,
     center_y: i32,
@@ -49,26 +49,26 @@ pub fn show_overlay(
 }
 
 #[tauri::command]
-pub fn hide_overlay(window: WebviewWindow) -> Result<(), String> {
+fn hide_overlay(window: WebviewWindow) -> Result<(), String> {
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     window::manager::hide_overlay(hwnd);
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_cursor_position() -> Result<(i32, i32), String> {
+fn get_cursor_position() -> Result<(i32, i32), String> {
     let pt = window::manager::get_current_cursor_pos().map_err(|e| e.to_string())?;
     Ok((pt.x, pt.y))
 }
 
 #[tauri::command]
-pub fn get_monitor_geometry(x: i32, y: i32) -> Result<window::MonitorGeometry, String> {
+fn get_monitor_geometry(x: i32, y: i32) -> Result<window::MonitorGeometry, String> {
     window::manager::get_monitor_geometry_from_point(POINT { x, y })
         .ok_or_else(|| "Failed to retrieve monitor geometry for coordinates".to_string())
 }
 
 #[tauri::command]
-pub fn calculate_clamped_placement(
+fn calculate_clamped_placement(
     cursor_x: i32,
     cursor_y: i32,
     radius: i32,
@@ -88,7 +88,7 @@ pub fn calculate_clamped_placement(
 }
 
 #[tauri::command]
-pub fn get_hook_status(state: State<'_, AppHookState>) -> bool {
+fn get_hook_status(state: State<'_, AppHookState>) -> bool {
     if let Ok(lock) = state.worker.lock() {
         if let Some(worker) = lock.as_ref() {
             return worker.is_running();
@@ -98,7 +98,7 @@ pub fn get_hook_status(state: State<'_, AppHookState>) -> bool {
 }
 
 #[tauri::command]
-pub fn get_gesture_status(state: State<'_, AppGestureState>) -> bool {
+fn get_gesture_status(state: State<'_, AppGestureState>) -> bool {
     if let Ok(lock) = state.worker.lock() {
         if let Some(worker) = lock.as_ref() {
             return worker.is_running();
@@ -108,7 +108,7 @@ pub fn get_gesture_status(state: State<'_, AppGestureState>) -> bool {
 }
 
 #[tauri::command]
-pub fn set_hook_trigger_button(
+fn set_hook_trigger_button(
     button_name: String,
     hook_state: State<'_, AppHookState>,
 ) -> Result<(), String> {
@@ -131,7 +131,7 @@ pub fn set_hook_trigger_button(
 }
 
 #[tauri::command]
-pub fn set_hook_suppress(
+fn set_hook_suppress(
     suppress: bool,
     state: State<'_, AppHookState>,
 ) -> Result<(), String> {
@@ -145,7 +145,7 @@ pub fn set_hook_suppress(
 }
 
 #[tauri::command]
-pub fn get_active_profile(
+fn get_active_profile(
     state: State<'_, AppProfileState>,
 ) -> Result<profile::ProfileConfig, String> {
     let guard = state.active_profile.read().map_err(|e| e.to_string())?;
@@ -153,12 +153,12 @@ pub fn get_active_profile(
 }
 
 #[tauri::command]
-pub fn get_foreground_process() -> Result<Option<profile::ProcessInfo>, String> {
+fn get_foreground_process() -> Result<Option<profile::ProcessInfo>, String> {
     Ok(profile::get_current_foreground_process())
 }
 
 #[tauri::command]
-pub fn reload_profiles(
+fn reload_profiles(
     _state: State<'_, AppProfileState>,
     app: tauri::AppHandle,
 ) -> Result<usize, String> {
@@ -166,32 +166,32 @@ pub fn reload_profiles(
 }
 
 #[tauri::command]
-pub fn open_config_folder() -> Result<(), String> {
+fn open_config_folder() -> Result<(), String> {
     tray::open_config_folder()
 }
 
 #[tauri::command]
-pub fn is_omni_enabled(app: tauri::AppHandle) -> bool {
+fn is_omni_enabled(app: tauri::AppHandle) -> bool {
     tray::is_app_enabled(&app)
 }
 
 #[tauri::command]
-pub fn toggle_omni_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+fn toggle_omni_enabled(app: tauri::AppHandle) -> Result<bool, String> {
     tray::toggle_app_enabled(&app)
 }
 
 #[tauri::command]
-pub fn set_omni_enabled(enabled: bool, app: tauri::AppHandle) -> Result<(), String> {
+fn set_omni_enabled(enabled: bool, app: tauri::AppHandle) -> Result<(), String> {
     tray::set_app_enabled(&app, enabled)
 }
 
 #[tauri::command]
-pub fn exit_app(app: tauri::AppHandle) {
+fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
 #[tauri::command]
-pub fn set_active_profile_by_name(
+fn set_active_profile_by_name(
     name: String,
     state: State<'_, AppProfileState>,
     app: tauri::AppHandle,
@@ -214,7 +214,7 @@ pub fn set_active_profile_by_name(
 }
 
 #[tauri::command]
-pub fn list_available_profiles(
+fn list_available_profiles(
     state: State<'_, AppProfileState>,
 ) -> Result<Vec<profile::ProfileConfig>, String> {
     let mgr = state.manager.read().map_err(|e| e.to_string())?;
@@ -222,7 +222,7 @@ pub fn list_available_profiles(
 }
 
 #[tauri::command]
-pub fn execute_action(
+fn execute_action(
     action: profile::ActionConfig,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
@@ -239,7 +239,7 @@ pub fn execute_action(
 }
 
 #[tauri::command]
-pub fn execute_slice_action(
+fn execute_slice_action(
     slice_id: String,
     ring_id: Option<String>,
     state: State<'_, AppProfileState>,
